@@ -1,0 +1,9 @@
+Shows An Image
+NOTE: Seperate both values with "," no spaces.
+
+Value 1: X Position, Y Position and Scale
+Value 2: Image Name, Camera position, and Duration.
+Note: Camera Position decides if the image is 
+on the sprite camera, (type "game") 
+behind the arrows, (type "hud")
+or above everything (type "other")
