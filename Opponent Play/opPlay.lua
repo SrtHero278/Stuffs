@@ -8,6 +8,8 @@ local layerDad = 0;
 local layerBF = 0;
 local swaps = 0
 
+local arrowTextures = {"NOTE_assets", "NOTE_assets", "NOTE_assets", "NOTE_assets", "NOTE_assets", "NOTE_assets", "NOTE_assets", "NOTE_assets"};
+
 function setOppo(value)
     if value or value == "true" then -- in case it's a string
 	return false
@@ -127,6 +129,22 @@ function onUpdatePost()
 	    noteTweenX('move6', 6, defaultPlayerStrumX2, 0.01, 'linear');
 	    noteTweenX('move7', 7, defaultPlayerStrumX3, 0.01, 'linear');
 	end
+
+	for i = 0, 3, 1 do
+	    arrowTextures[i + 1] = getPropertyFromGroup('opponentStrums', i, 'texture');
+	    arrowTextures[i + 5] = getPropertyFromGroup('playerStrums', i, 'texture');
+	    if arrowTextures[i + 1] == "" or arrowTextures[i + 1] == " " then
+		arrowTextures[i + 1] = "NOTE_assets";
+	    end
+	    if arrowTextures[i + 5] == "" or arrowTextures[i + 5] == " " then
+		arrowTextures[i + 5] = "NOTE_assets";
+	    end
+	    playerText = arrowTextures[i + 5];
+	    dadText = arrowTextures[i + 1];
+	    setPropertyFromGroup('opponentStrums', i, 'texture', playerText);
+	    setPropertyFromGroup('playerStrums', i, 'texture', dadText);
+	end
+
 	debugPrint("toggled opponent play") -- it's nice to know.
     end
 
