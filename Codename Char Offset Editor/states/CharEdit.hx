@@ -1,5 +1,5 @@
 import funkin.system.MusicBeatSubstate;
-
+import funkin.game.Stage;
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
@@ -11,7 +11,7 @@ import haxe.ds.StringMap; //This works for me.
 
 var init:Bool = false;
 
-var gridBG:FlxSprite;
+
 
 var offsetType:String = "animation";
 var daAnim:String = 'spooky';
@@ -29,6 +29,7 @@ var animList:Array<String> = [];
 var animXmls:StringMap<Xml>;
 var curAnim:Int = 0;
 var camFollow:FlxObject;
+var stage:Stage;
 
 function postCreate() {
 	init = true;
@@ -36,10 +37,9 @@ function postCreate() {
 	if (FlxG.sound.music != null)
 		FlxG.sound.music.stop();
 
-	gridBG = FlxGridOverlay.create(50, 50);
-	gridBG.scrollFactor.set(0, 0);
-	gridBG.color = 0xFF3B3B3B;
-	add(gridBG);
+
+	stage = new Stage('stage');
+	add(stage);
 
 	ghostChar = new Character(0, 0, daAnim);
 	ghostChar.debugMode = true;
@@ -142,6 +142,10 @@ void main() {
 	");
 	cameraPoint.antialiasing = true;
 	add(cameraPoint);
+	
+	var charpos = char.getCameraPosition();
+	camFollow.x = charpos.x;
+	camFollow.y = charpos.y;
 
 	var invalidAnims = [];
 	animXmls = new StringMap();
@@ -197,8 +201,6 @@ function update(elapsed:Float) {
 		else if (FlxG.camera.zoom >= 1 + 0.25 * 31)
 			FlxG.camera.zoom = 1 + 0.25 * 30;
 
-		var zoomScale:Float = 1 / FlxG.camera.zoom;
-		gridBG.scale.set(zoomScale, zoomScale);
 	}
 
 	var multiplier:Int = 1;
@@ -261,8 +263,9 @@ function update(elapsed:Float) {
 			saveXml();
 		case 2:
 			FlxG.camera.zoom = 1;
-			gridBG.scale.set(1, 1);
-			camFollow.screenCenter();
+			var charpos = char.getCameraPosition();
+			camFollow.x = charpos.x;
+			camFollow.y = charpos.y;
 		case 3: 
 			persistentUpdate = false;
 			persistentDraw = true;
