@@ -1,5 +1,3 @@
-import funkin.system.MusicBeatSubstate;
-
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
@@ -14,7 +12,7 @@ var init:Bool = false;
 var gridBG:FlxSprite;
 
 var offsetType:String = "animation";
-var daAnim:String = 'spooky';
+//var daAnim:String = 'spooky';
 var char:Character;
 var ghostChar:Character;
 var cameraPoint:FlxSprite;
@@ -266,7 +264,7 @@ function update(elapsed:Float) {
 		case 3: 
 			persistentUpdate = false;
 			persistentDraw = true;
-			openSubState(new MusicBeatSubstate(true, "SelectChar"));
+			openSubState(new ModSubState("SelectChar"));
 		case 4: 
 			FlxG.switchState(new PlayState());
 	}
