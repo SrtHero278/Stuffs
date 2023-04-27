@@ -1,9 +1,8 @@
-import funkin.system.MusicBeatState;
 import flixel.group.FlxTypedGroup;
-import flixel.system.FlxSound;
+import flixel.sound.FlxSound;
 import flixel.FlxCamera;
-import funkin.ui.Alphabet;
 import haxe.io.Path;
+import funkin.backend.scripting.Script;
 
 var chars:Array<String> = [];
 var curSelected:Int = 0;
@@ -66,7 +65,6 @@ function update(elapsed:Float) {
 	if (controls.ACCEPT) {
 		if (curSelected == betArray.length - 1) {close(); return;}
 
-		var state = new MusicBeatState(true, "CharEdit");
 		var boolIndex = [(curSelected == 0), (curSelected == 1), (curSelected == 2), true].indexOf(true);
 		var charArray = [
 			PlayState.instance.boyfriend.curCharacter,
@@ -74,8 +72,8 @@ function update(elapsed:Float) {
 			PlayState.instance.dad.curCharacter, 
 			chars[curSelected]
 		];
-		state.stateScript.set("daAnim", charArray[boolIndex]);
-		FlxG.switchState(state);
+		Script.staticVariables.set("daAnim", charArray[boolIndex]);
+		FlxG.switchState(new ModState("CharEdit"));
 	} else if (controls.BACK)
 		close();
 	else if (controls.UP_P || controls.DOWN_P)
@@ -115,9 +113,8 @@ function update(elapsed:Float) {
 	if (controls.ACCEPT) {
 		if (curSelected == betArray.length - 1) {close(); return;}
 
-		var state = new MusicBeatState(true, "CharEdit");
-		state.stateScript.set("daAnim", chars[curSelected]);
-		FlxG.switchState(state);
+		Script.staticVariables.set("daAnim", chars[curSelected]);
+		FlxG.switchState(new ModState("CharEdit"));
 	} else if (controls.BACK)
 		close();
 	else if (controls.UP_P || controls.DOWN_P)
