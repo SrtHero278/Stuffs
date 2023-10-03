@@ -1,3 +1,3 @@
 # DONT PUT THIS IN A MOD FOLDER.
 
-put these files in **GAMEFOLDER/assets**!
+put these folder in **GAMEFOLDER/addons**!
