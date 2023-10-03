@@ -1,0 +1,180 @@
+import haxe.ds.StringMap;
+
+import flixel.group.FlxTypedGroup;
+import flixel.FlxCamera;
+
+import funkin.editors.ui.UIState;
+import funkin.editors.ui.UITopMenu;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UIButtonList;
+import funkin.editors.ui.UISubstateWindow;
+import funkin.game.Stage;
+
+var editingSprite = null;
+var stageCamera = new FlxCamera();
+stageCamera.bgColor = 0;
+var stageGroup = new FlxTypedGroup();
+var stage = new Stage();
+
+var sprList:UIButtonList;
+var spriteMap:StringMap = new StringMap();
+
+var topMenu;
+
+function create() {
+	FlxG.mouse.visible = true;
+
+	topMenu = [
+		{
+			label: "File",
+			childs: [
+				{
+					label: "New (UNIMPLEMENTED)",
+					//onSelect: _file_new,
+				},
+				null,
+				{
+					label: "Save (UNIMPLEMENTED)",
+					keybind: [17, 83],
+					//onSelect: _file_save,
+				},
+				{
+					label: "Save As... (UNIMPLEMENTED)",
+					keybind: [17, 16, 83],
+					//onSelect: _file_saveas,
+				},
+				null,
+				{
+					label: "Exit",
+					//onSelect: _file_exit
+				}
+			]
+		},
+		{
+			label: "Sprites",
+			childs: [
+				{
+					label: "New Sprite",
+					onSelect: function(_) {
+						editingSprite = null;
+						openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+					}
+				}
+			]
+		}
+	];
+
+	sprList = new UIButtonList(FlxG.width - 265, 30, 250, FlxG.height - 45, "Sprite List", FlxPoint.get(250, 54), null, 0);
+	sprList.frames = Paths.getFrames('editors/ui/inputbox');
+	sprList.addButton.callback = function() {
+		editingSprite = null;
+		openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+	}
+	add(sprList);
+
+	FlxG.cameras.add(stageCamera, false);
+	stageGroup.cameras = [stageCamera];
+	add(stageGroup);
+
+	var topSpr = new UITopMenu(topMenu);
+	add(topSpr);
+}
+
+var lastMoving;
+
+function update() {
+	if (FlxG.keys.justPressed.R)
+		FlxG.switchState(new UIState(true, "stageEditor/StageEdit"));
+
+	lastMoving = sprList.curMoving;
+}
+
+function postUpdate() {
+	if (lastMoving != null && lastMoving != sprList.curMoving) {
+		for (i in 0...sprList.buttons.members.length) {
+			var sprName = sprList.buttons.members[i].field.text;
+			spriteMap[sprName].index = i;
+
+			var spr = stage.stageSprites.get(sprName);
+			stageGroup.remove(spr, true);
+			stageGroup.add(spr);
+		}
+	}
+
+	for (item in spriteMap.iterator()) {
+		item.button.field.x += 10;
+		item.deleteButton.y = item.button.y + item.button.bHeight * 0.5 - item.deleteButton.bHeight * 0.5;
+		item.deleteIcon.y = item.deleteButton.y + 8;
+		item.childButton.y = item.deleteButton.y;
+		item.childIcon.y = item.childButton.y + 8;
+		item.editButton.y = item.childButton.y;
+		item.editIcon.y = item.editButton.y + 8;
+	}
+}
+
+function saveSprButton() {
+	var sprName = editingSprite.node.get("name");
+
+	if (editingSprite.index <= -1) {
+		var daButton = new UIButton(0, 0, sprName, null, 250, 54);
+		daButton.field.alignment = "left";
+		sprList.add(daButton);
+
+		var deleteButton = new UIButton(daButton.x + daButton.bWidth - 36, daButton.bHeight/2 - 16, "", function () {
+			var sprName = daButton.field.text;
+			var spr = stage.stageSprites[sprName];
+			stageGroup.remove(spr, true);
+			stage.stageSprites.remove(sprName);
+			spr.destroy();
+			sprList.remove(daButton);
+			spriteMap.remove(sprName);
+
+			for (i in 0...sprList.buttons.members.length) { //fix the ordering again
+				var sprName = sprList.buttons.members[i].field.text;
+				spriteMap[sprName].index = i;
+			}
+		}, 32);
+		deleteButton.color = 0xFFFF0000;
+		deleteButton.autoAlpha = false;
+		daButton.members.push(deleteButton);
+
+		var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+		deleteIcon.antialiasing = false;
+		daButton.members.push(deleteIcon);
+
+		var childNodeButton = new UIButton(deleteButton.x - 36, deleteButton.y, "", function () {
+
+		}, 32);
+		childNodeButton.autoAlpha = false;
+		daButton.members.push(childNodeButton);
+
+		var childNodeIcon = new FlxSprite(childNodeButton.x + (15/2), childNodeButton.y + 8, Paths.image('editors/stage/node-button'));
+		childNodeIcon.antialiasing = false;
+		daButton.members.push(childNodeIcon);
+
+		var editButton = new UIButton(childNodeButton.x - 36, deleteButton.y, "", function () {
+			editingSprite = spriteMap[daButton.field.text];
+			openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+		}, 32);
+		editButton.color = 0xFFFFFF00;
+		editButton.autoAlpha = false;
+		daButton.members.push(editButton);
+
+		var editIcon = new FlxSprite(editButton.x + (15/2), editButton.y + 8, Paths.image('editors/character/edit-button'));
+		editIcon.antialiasing = false;
+		daButton.members.push(editIcon);
+
+		editingSprite.button = daButton;
+		editingSprite.deleteButton = deleteButton;
+		editingSprite.deleteIcon = deleteIcon;
+		editingSprite.childButton = childNodeButton;
+		editingSprite.childIcon = childNodeIcon;
+		editingSprite.editButton = editButton;
+		editingSprite.editIcon = editIcon;
+
+		editingSprite.index = stageGroup.length;
+	} else {
+		daButton = sprList.buttons.members[editingSprite.index];
+		daButton.field.text = sprName;
+	}
+}
