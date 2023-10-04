@@ -8,16 +8,19 @@ import funkin.editors.ui.UITopMenu;
 import funkin.editors.ui.UIButton;
 import funkin.editors.ui.UIButtonList;
 import funkin.editors.ui.UISubstateWindow;
+import funkin.game.StageCharPos;
 import funkin.game.Stage;
 
 var editingSprite = null;
-var stageCamera = new FlxCamera();
-stageCamera.bgColor = 0;
 var stageGroup = new FlxTypedGroup();
 var stage = new Stage();
 
+var uiCamera = new FlxCamera();
+uiCamera.bgColor = 0;
+
 var sprList:UIButtonList;
 var spriteMap:StringMap = new StringMap();
+var charMap:StringMap = new StringMap();
 
 var topMenu;
 
@@ -64,7 +67,10 @@ function create() {
 		}
 	];
 
+	FlxG.cameras.add(uiCamera, false);
+
 	sprList = new UIButtonList(FlxG.width - 265, 30, 250, FlxG.height - 45, "Sprite List", FlxPoint.get(250, 54), null, 0);
+	sprList.cameras = [uiCamera];
 	sprList.frames = Paths.getFrames('editors/ui/inputbox');
 	sprList.addButton.callback = function() {
 		editingSprite = null;
@@ -72,12 +78,20 @@ function create() {
 	}
 	add(sprList);
 
-	FlxG.cameras.add(stageCamera, false);
-	stageGroup.cameras = [stageCamera];
-	add(stageGroup);
+	var spc = new Character(400, 130, "gf", false);
+	makeCharButton("Spectator", null, 0xFFA5004D, spc);
+
+	var cpu = new Character(100, 100, "dad", false);
+	makeCharButton("Opponent", null, 0xFFAF66CE, cpu);
+
+	var plr = new Character(770, 100, "bf", true);
+	makeCharButton("Player", null, 0xFF31B0D1, plr);
 
 	var topSpr = new UITopMenu(topMenu);
+	topSpr.cameras = [uiCamera];
 	add(topSpr);
+
+	add(stageGroup);
 }
 
 var lastMoving;
@@ -92,12 +106,13 @@ function update() {
 function postUpdate() {
 	if (lastMoving != null && lastMoving != sprList.curMoving) {
 		for (i in 0...sprList.buttons.members.length) {
-			var sprName = sprList.buttons.members[i].field.text;
-			spriteMap[sprName].index = i;
+			var button = sprList.buttons.members[i];
+			var sprName = button.field.text;
+			var spr = (button.color == 0xFFFFFF) ? spriteMap[sprName] : charMap[sprName];
+			spr.index = i;
 
-			var spr = stage.stageSprites.get(sprName);
-			stageGroup.remove(spr, true);
-			stageGroup.add(spr);
+			stageGroup.remove(spr.sprite, true);
+			stageGroup.add(spr.sprite);
 		}
 	}
 
@@ -108,6 +123,15 @@ function postUpdate() {
 		item.childButton.y = item.deleteButton.y;
 		item.childIcon.y = item.childButton.y + 8;
 		item.editButton.y = item.childButton.y;
+		item.editIcon.y = item.editButton.y + 8;
+	}
+
+	for (item in charMap.iterator()) {
+		item.button.field.x += 10;
+
+		item.switchButton.y = item.button.y + item.button.bHeight * 0.5 - item.switchButton.bHeight * 0.5;
+		item.switchIcon.y = item.switchButton.y + 8;
+		item.editButton.y = item.switchButton.y;
 		item.editIcon.y = item.editButton.y + 8;
 	}
 }
@@ -122,17 +146,22 @@ function saveSprButton() {
 
 		var deleteButton = new UIButton(daButton.x + daButton.bWidth - 36, daButton.bHeight/2 - 16, "", function () {
 			var sprName = daButton.field.text;
-			var spr = stage.stageSprites[sprName];
-			stageGroup.remove(spr, true);
-			stage.stageSprites.remove(sprName);
-			spr.destroy();
 			sprList.remove(daButton);
 			spriteMap.remove(sprName);
 
 			for (i in 0...sprList.buttons.members.length) { //fix the ordering again
-				var sprName = sprList.buttons.members[i].field.text;
-				spriteMap[sprName].index = i;
+				var button = sprList.buttons.members[i];
+				var sprName = button.field.text;
+				if (button.color == 0xFFFFFF)
+					spriteMap[sprName].index = i;
+				else
+					charMap[sprName].index = i;
 			}
+
+			var spr = stage.stageSprites[sprName];
+			stageGroup.remove(spr, true);
+			stage.stageSprites.remove(sprName);
+			spr.destroy();
 		}, 32);
 		deleteButton.color = 0xFFFF0000;
 		deleteButton.autoAlpha = false;
@@ -177,4 +206,47 @@ function saveSprButton() {
 		daButton = sprList.buttons.members[editingSprite.index];
 		daButton.field.text = sprName;
 	}
+}
+
+function makeCharButton(name:String, node, color, character) {
+	var daButton = new UIButton(0, 0, name, null, 250, 54);
+	daButton.frames = Paths.getFrames("editors/stage/buttonDesat");
+	daButton.color = color;
+	daButton.field.alignment = "left";
+	sprList.add(daButton);
+
+	var switchButton = new UIButton(daButton.x + daButton.bWidth - 36, daButton.bHeight/2 - 16, "", function () {
+		editingSprite = charMap[name];
+		openSubState(new ModSubState("stageEditor/SwitchScreen"));
+	}, 32);
+	switchButton.autoAlpha = false;
+	daButton.members.push(switchButton);
+
+	var switchIcon = new FlxSprite(switchButton.x + (15/2), switchButton.y + 8, Paths.image('editors/stage/switch-button'));
+	switchIcon.antialiasing = false;
+	daButton.members.push(switchIcon);
+
+	var editButton = new UIButton(switchButton.x - 36, switchButton.y, "", function () {
+
+	}, 32);
+	editButton.color = 0xFFFFFF00;
+	editButton.autoAlpha = false;
+	daButton.members.push(editButton);
+
+	var editIcon = new FlxSprite(editButton.x + (15/2), editButton.y + 8, Paths.image('editors/character/edit-button'));
+	editIcon.antialiasing = false;
+	daButton.members.push(editIcon);
+
+	charMap[name] = {
+		index: stageGroup.length,
+		node: node,
+		sprite: character,
+
+		button: daButton,
+		switchButton: switchButton,
+		switchIcon: switchIcon,
+		editButton: editButton,
+		editIcon: editIcon
+	};
+	stageGroup.add(character);
 }

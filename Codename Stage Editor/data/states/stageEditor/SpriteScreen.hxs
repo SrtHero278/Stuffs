@@ -1,5 +1,4 @@
 var editingSprite = FlxG.state.stateScript.get("editingSprite"); // kinda weird way of getting it but cameras break on static vars.
-var stageCamera = FlxG.state.stateScript.get("stageCamera");
 var stageGroup = FlxG.state.stateScript.get("stageGroup");
 var stage = FlxG.state.stateScript.get("stage");
 
@@ -186,7 +185,6 @@ function saveData() {
 	spriteMap.set(editingSprite.node.get("name"), editingSprite);
 
 	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node);
-	editingSprite.sprite.cameras = [stageCamera];
 	stage.stageSprites.set(editingSprite.node.get("name"), editingSprite.sprite);
 	stageGroup.insert(editingSprite.index, editingSprite.sprite);
 }

@@ -1,0 +1,118 @@
+import Xml;
+import haxe.io.Path;
+
+import flixel.addons.display.FlxBackdrop;
+import flixel.FlxCamera;
+
+import openfl.filters.ShaderFilter;
+
+import funkin.backend.scripting.Script;
+import funkin.options.OptionsScreen;
+import funkin.options.OptionsTree;
+import funkin.options.type.IconOption;
+
+var tree;
+
+var camShaders = [];
+var blurShader:CustomShader = new CustomShader(Options.intensiveBlur ? "engine/editorBlur" : "engine/editorBlurFast");
+var screenCam = new FlxCamera();
+
+function create() {
+	CoolUtil.playMenuSFX(0);
+
+	for(c in FlxG.cameras.list) { //i love copy pasting
+		// Prevent adding a shader if it already has one
+		if(c._filters != null) {
+			var shouldSkip = false;
+			for(filter in c._filters) {
+				if(Std.isOfType(filter, ShaderFilter)) {
+					if(Std.isOfType(filter.shader, CustomShader)) {
+						var shader:CustomShader = filter.shader;
+
+						if(shader.path == blurShader.path) {
+							shouldSkip = true;
+							break;
+						}
+					}
+				}
+			}
+			if(shouldSkip)
+				continue;
+		}
+		camShaders.push(c);
+		c.addShader(blurShader);
+	}
+
+	screenCam.bgColor = 0;
+	FlxG.cameras.add(screenCam, false);
+
+	var bg = new FlxBackdrop();
+	bg.velocity.set(125, 125);
+	bg.loadGraphic(Paths.image('editors/bgs/charter'));
+	bg.antialiasing = true;
+	bg.alpha = 0.5;
+	add(bg);
+
+	var modsList:Array<String> = Character.getList(true);
+
+	var list = [ //i love copy pasting 2
+		for (char in (modsList.length == 0 ? Character.getList(false) : modsList))
+			new IconOption(char, "Press ACCEPT to edit this character.", Character.getIconFromCharName(char), changeChar)
+	];
+
+	tree = new OptionsTree();
+	tree.add(new OptionsScreen("Character List", "Select a character to switch to.", list));
+	add(tree);
+
+	cameras = [screenCam];
+}
+
+function update(e) {
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
+}
+
+function onDestroy() {
+	for(e in camShaders)
+		e.removeShader(blurShader);
+	blurShader = null;
+
+	FlxG.cameras.remove(screenCam);
+}
+
+function changeChar() {
+	var char = FlxG.state.stateScript.get("editingSprite").sprite;
+
+	for (key in char.animOffsets.keys()) {
+		var point = char.animOffsets[key];
+		char.animOffsets.remove(key);
+		if(point != null)
+			point.put();
+	}
+	char.curCharacter = tree.members[0].members[tree.members[0].curSelected].text; // hehe messiness on purpose ^v^
+	char.antialiasing = true;
+
+	var xmlPath = Paths.xml('characters/' + char.curCharacter);
+	if (!Assets.exists(xmlPath)) {
+		char.curCharacter = "bf";
+		xmlPath = Paths.xml('characters/bf');
+	}
+
+	var plainXML = Assets.getText(xmlPath);
+
+	char.xml = Xml.parse(plainXML).firstElement();
+	if (char.xml == null) {
+		trace("\"character\" node was missing! Loading BF instead.");
+		char.curCharacter = "bf";
+		xmlPath = Paths.xml('characters/bf');
+		char.xml = Xml.parse(Assets.getText(xmlPath)).firstElement();
+	}
+
+	char.script = Script.create(Paths.script(Path.withoutExtension(xmlPath), null, true));
+	char.script.setParent(char);
+	char.script.load();
+	char.applyXML(char.xml);
+	char.script.call("create");
+	char.script.call("postCreate");
+	close();
+}
