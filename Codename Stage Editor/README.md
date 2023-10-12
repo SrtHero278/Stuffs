@@ -6,4 +6,4 @@ put this folder in **GAMEFOLDER/addons**! (You may need to make the addons folde
 
 dont expect everything to be here.
 
-theres only sprite creation so far.
+however, you can make a basic stage with this so far!
