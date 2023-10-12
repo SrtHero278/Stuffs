@@ -1,0 +1,61 @@
+import funkin.backend.assets.ModsFolder;
+import funkin.editors.ui.UIState;
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+
+import sys.io.File;
+import sys.FileSystem;
+
+function create() {
+	winTitle = 'New Stage';
+	
+	winWidth = 230;
+	winHeight = 150;
+}
+
+function postCreate() {
+	function addLabelOn(ui, text:String)
+		add(new UIText(ui.x, ui.y - 24, 0, text));
+
+	var nameTextBox = new UITextBox(windowSpr.x + 20, windowSpr.y + 60, "stage", 190);
+	add(nameTextBox);
+	addLabelOn(nameTextBox, "Stage Name");
+
+	var saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20, windowSpr.y + windowSpr.bHeight - 16 - 32, "Create", function() {
+		var prefix = (ModsFolder.currentModFolder == null) ? "./assets" : (ModsFolder.modsPath + ModsFolder.currentModFolder);
+
+		if (!FileSystem.exists(prefix + "/data") || !FileSystem.isDirectory(prefix + "/data"))
+			FileSystem.createDirectory(prefix + "/data");
+		if (!FileSystem.exists(prefix + "/data/stages") || !FileSystem.isDirectory(prefix + "/data/stages"))
+			FileSystem.createDirectory(prefix + "/data/stages");
+
+		File.saveContent(prefix + "/data/stages/" + nameTextBox.label.text + ".xml", "<stage/>");
+		StageEditor_stage = nameTextBox.label.text;
+		FlxG.switchState(new UIState(true, "stageEditor/StageEdit"));
+		close();
+	}, 75);
+	add(saveButton);
+	saveButton.frames = Paths.getFrames("editors/ui/grayscale-button");
+	saveButton.color = 0xFF00FF00;
+	saveButton.x -= saveButton.bWidth;
+
+	var closeButton = new UIButton(saveButton.x - 20, saveButton.y, "Cancel", function() {
+		close();
+	}, 75);
+	add(closeButton);
+	closeButton.frames = Paths.getFrames("editors/ui/grayscale-button");
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+}
+
+var callPost:Bool = true;
+function update() {
+	if (callPost) {
+		callPost = false;
+		postCreate();
+	}
+
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
+}

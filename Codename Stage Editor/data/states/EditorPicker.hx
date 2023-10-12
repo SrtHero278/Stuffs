@@ -1,4 +1,4 @@
-import funkin.editors.ui.UIState;
+import funkin.editors.EditorTreeMenu;
 import flixel.effects.FlxFlicker;
 
 var stageIndex = -1;
@@ -17,7 +17,9 @@ function update() {
 	if (curSelected == stageIndex && selected && FlxFlicker.isFlickering(sprites[stageIndex].label)) {
 		FlxFlicker._boundObjects[sprites[stageIndex].label].completionCallback = function(flick) {
 			subCam.fade(0xFF000000, 0.25, false, function() {
-				FlxG.switchState(new UIState(true, "stageEditor/StageEdit"));
+				var state = new EditorTreeMenu();
+				state.scriptName = "stageEditor/selector/StageSelector"; // OVERRIDING NEW AIANT GON STOP ME OPTIONS.TREEMENU
+				FlxG.switchState(state);
 			});
 		}
 		overrodeFlicker = true;

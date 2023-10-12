@@ -1,6 +1,8 @@
-var editingSprite = FlxG.state.stateScript.get("editingSprite"); // kinda weird way of getting it but cameras break on static vars.
+var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScript.get("editingSprite");
 var stageGroup = FlxG.state.stateScript.get("stageGroup");
-var stage = FlxG.state.stateScript.get("stage");
+var xml = FlxG.state.stateScript.get("xml");
 
 var spriteMap = FlxG.state.stateScript.get("spriteMap");
 
@@ -171,7 +173,6 @@ function saveData() {
 		editingSprite.node = curNode;
 		FlxG.state.stateScript.set("editingSprite", editingSprite);
 	} else if (!newSprite) {
-		stage.stageSprites.remove(oldName);
 		spriteMap.remove(oldName);
 	}
 
@@ -184,8 +185,8 @@ function saveData() {
 	FlxG.state.call("saveSprButton");
 	spriteMap.set(editingSprite.node.get("name"), editingSprite);
 
-	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node);
-	stage.stageSprites.set(editingSprite.node.get("name"), editingSprite.sprite);
+	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+	editingSprite.sprite.shader = brightenShader;
 	stageGroup.insert(editingSprite.index, editingSprite.sprite);
 }
 

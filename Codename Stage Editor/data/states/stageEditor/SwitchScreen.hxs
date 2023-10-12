@@ -89,6 +89,10 @@ function changeChar() {
 		if(point != null)
 			point.put();
 	}
+	if (char.animateAtlas != null) {
+		char.animateAtlas.destroy();
+		char.animateAtlas = null;
+	}
 	char.curCharacter = tree.members[0].members[tree.members[0].curSelected].text; // hehe messiness on purpose ^v^
 	char.antialiasing = true;
 

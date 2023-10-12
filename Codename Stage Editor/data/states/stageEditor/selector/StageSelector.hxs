@@ -1,0 +1,40 @@
+import haxe.io.Path;
+
+import funkin.backend.system.framerate.Framerate;
+import funkin.options.type.TextOption;
+import funkin.options.type.NewOption;
+import funkin.options.OptionsScreen;
+import funkin.editors.ui.UISubstateWindow;
+import funkin.editors.ui.UIState;
+
+static var StageEditor_stage = "<NONE>";
+
+bgType = "charter";
+
+function create() {
+	Framerate.offset.y = 60;
+
+	var modsList = getList(true);
+
+	var list = [
+		for (stage in (modsList.length == 0 ? getList(false) : modsList))
+			new TextOption(stage, "Press ACCEPT to edit this stage.",
+			function() {
+				StageEditor_stage = stage;
+				FlxG.switchState(new UIState(true, "stageEditor/StageEdit"));
+			})
+	];
+
+	list.insert(0, new NewOption("New Stage", "Press ACCEPT to create a stage.", function() {
+		openSubState(new UISubstateWindow(true, "stageEditor/selector/NewStage"));
+	}));
+
+	main = new OptionsScreen("Stage Editor", "Select a stage to modify.", list);
+}
+
+function getList(mods) {
+	return [
+		for (path in Paths.getFolderContent('data/stages/', true, mods ? false : null)) // BOTH: null | MODS: false
+			if (Path.extension(path) == "xml") Path.withoutDirectory(Path.withoutExtension(path))
+	];
+}
