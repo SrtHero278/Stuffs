@@ -1,6 +1,9 @@
 import lime.ui.FileDialog;
 import lime.ui.FileDialogType;
 import openfl.ui.Mouse;
+import openfl.Lib;
+
+import flxanimate.data.Loop;
 
 import sys.io.File;
 import haxe.io.Path;
@@ -14,6 +17,7 @@ import flixel.group.FlxTypedSpriteGroup;
 import flixel.group.FlxTypedGroup;
 import flixel.FlxCamera;
 
+import funkin.backend.assets.ModsFolder;
 import funkin.editors.EditorTreeMenu;
 import funkin.editors.ui.UIState;
 import funkin.editors.ui.UITopMenu;
@@ -165,6 +169,8 @@ function create() {
 
 	add(stageGroup);
 
+	Lib.current.stage.window.onDropFile.add(dropFile);
+
 	// i hate texture atlases i hate texture atlases i hate texture atlases i hate texture atlases FUCK THIS
 	/*var instance = charMap["Spectator"].sprite.animateAtlas.anim.curInstance;
 	var symbol = charMap["Spectator"].sprite.animateAtlas.anim.symbolDictionary.get(instance.symbol.name);
@@ -191,11 +197,100 @@ function create() {
 		}
 	}
 
+	var atlas = charMap["Spectator"].sprite.animateAtlas;
+	var anim = atlas.anim;
+	anim.play("danceLeft");
+
+	/*if (instance.bitmap != null){
+		drawLimb(frames.getByName(instance.bitmap), matrix, colorEffect);
+
+		colorTransformsPool.put(colorEffect);
+		matrixesPool.put(matrix);
+		return;
+	}
+
+	var symbol = anim.symbolDictionary.get(anim.curInstance.symbol.name);
+	var firstFrame:Int = anim.curInstance.symbol.firstFrame + anim.curInstance.curFrame;
+
+	var layers = symbol.timeline.getList();
+	for (i in 0...layers.length)
+	{
+		var layer = layers[layers.length - 1 - i];
+
+		if (!layer.visible) continue;
+		var frame = layer.get(firstFrame);
+
+		trace(frame);
+		if (frame == null) continue;
+
+		for (element in frame.getList())
+		{
+			var firstframe = 0;
+			if (element.symbol != null && element.symbol.loop != Loop.SingleFrame)
+			{
+				firstframe = firstFrame - frame.index;
+			}
+
+			trace(element);
+			//parseElement(element, firstframe, matrix, coloreffect);
+		}
+	}
+
 	var dot = new FlxSprite(
 		charMap["Spectator"].sprite.animateAtlas.x,
 		charMap["Spectator"].sprite.animateAtlas.y
 	).makeGraphic(charMap["Spectator"].sprite.animateAtlas.width, charMap["Spectator"].sprite.animateAtlas.height, 0x80FFFFFF);
 	add(dot);*/
+}
+
+function dropFile(file) {
+	file = StringTools.replace(file, "\\", "/");
+	cwd = StringTools.replace(Sys.getCwd(), "\\", "/");
+
+	var prefix = (ModsFolder.currentModFolder == null) ? "./assets/images/" : (ModsFolder.modsPath + ModsFolder.currentModFolder+ "/images/");
+
+	if (!StringTools.startsWith(file, cwd)) {
+		var folder = xml.exists("folder") ? xml.get("folder") : "";
+
+		var oldPath = file;
+		file = cwd + prefix + folder + Path.withoutDirectory(file);
+		File.copy(oldPath, file);
+	}
+
+	var sprName = Path.withoutDirectory(Path.withoutExtension(file));
+
+	if (subState != null && subState.scriptName == "stageEditor/SpriteScreen") {
+		if (subState.stateScript.get("newSprite"))
+			subState.stateScript.get("nameTextBox").label.text = sprName;
+		subState.stateScript.get("fileTextBox").label.text = sprName;
+	} else {
+		if (spriteMap.exists(sprName)) {
+			editingSprite = spriteMap[sprName];
+			editingSprite.node.set("sprite", sprName);
+			stageGroup.remove(editingSprite.sprite, true);
+			editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
+		} else {
+			editingSprite = {
+				index: -1,
+				node: Xml.createElement("sprite")
+			};
+			editingSprite.node.set("name", sprName);
+			editingSprite.node.set("sprite", sprName);
+		}
+
+		saveSprButton();
+		spriteMap.set(editingSprite.node.get("name"), editingSprite);
+	
+		editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+		editingSprite.sprite.shader = brightenShader;
+		stageGroup.insert(editingSprite.index, editingSprite.sprite);
+	}
+
+	Lib.current.stage.window.focus();
+}
+
+function onDestroy() {
+	Lib.current.stage.window.onDropFile.remove(dropFile);
 }
 
 var uiPos = FlxPoint.get();

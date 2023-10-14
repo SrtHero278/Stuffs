@@ -170,7 +170,6 @@ function saveData() {
 	if (newSprite && spriteMap.exists(editingSprite.node.get("name"))) {
 		editingSprite = spriteMap[editingSprite.node.get("name")];
 		editingSprite.node = curNode;
-		FlxG.state.stateScript.set("editingSprite", editingSprite);
 	} else if (!newSprite) {
 		spriteMap.remove(oldName);
 	}
@@ -178,7 +177,6 @@ function saveData() {
 	if (editingSprite.sprite != null) {
 		stageGroup.remove(editingSprite.sprite, true);
 		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
-		editingSprite.sprite = null;
 	}
 
 	FlxG.state.stateScript.set("editingSprite", editingSprite);
