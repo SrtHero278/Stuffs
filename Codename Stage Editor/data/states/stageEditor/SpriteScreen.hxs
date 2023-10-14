@@ -61,7 +61,6 @@ function postCreate() {
 			index: -1,
 			node: Xml.createElement("sprite")
 		};
-		FlxG.state.stateScript.set("editingSprite", editingSprite);
 	}
 
 	nameTextBox = new UITextBox(title.x, title.y + title.height + 60, editingSprite.node.get("name"), 190);
@@ -182,6 +181,7 @@ function saveData() {
 		editingSprite.sprite = null;
 	}
 
+	FlxG.state.stateScript.set("editingSprite", editingSprite);
 	FlxG.state.call("saveSprButton");
 	spriteMap.set(editingSprite.node.get("name"), editingSprite);
 
