@@ -49,7 +49,7 @@ function create() {
 	winTitle = newSprite ? 'Creating Sprite' : 'Sprite ' + editingSprite.node.get("name") + ' properties';
 }
 
-function postCreate() {
+function createPost() {
 	function addLabelOn(ui, text:String)
 		add(new UIText(ui.x, ui.y - 24, 0, text));
 
@@ -191,7 +191,7 @@ function saveData() {
 function update() {
 	if (callPost) {
 		callPost = false;
-		postCreate();
+		createPost();
 	}
 
 	if (FlxG.keys.justPressed.ESCAPE)
