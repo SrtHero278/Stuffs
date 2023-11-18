@@ -3,7 +3,7 @@ import lime.ui.FileDialogType;
 import openfl.ui.Mouse;
 import openfl.Lib;
 
-import flxanimate.data.Loop;
+import flxanimate.FlxAnimate;
 
 import sys.io.File;
 import haxe.io.Path;
@@ -24,7 +24,6 @@ import funkin.editors.ui.UITopMenu;
 import funkin.editors.ui.UIButton;
 import funkin.editors.ui.UIButtonList;
 import funkin.editors.ui.UISubstateWindow;
-import funkin.game.StageCharPos;
 import funkin.game.Stage;
 
 var brightenShader = new FunkinShader("
@@ -171,76 +170,10 @@ function create() {
 
 	Lib.current.stage.window.onDropFile.add(dropFile);
 
-	// i hate texture atlases i hate texture atlases i hate texture atlases i hate texture atlases FUCK THIS
-	/*var instance = charMap["Spectator"].sprite.animateAtlas.anim.curInstance;
-	var symbol = charMap["Spectator"].sprite.animateAtlas.anim.symbolDictionary.get(instance.symbol.name);
-	for (layer in symbol.timeline.getList())
-	{
-		if (!layer.visible) continue;
-		var frame = layer.get(instance.symbol.firstFrame);
-
-		if (frame == null) continue;
-
-		for (element in frame.getList())
-		{
-			trace(element);
-			//trace(charMap["Spectator"].sprite.animateAtlas.frames.getByName(element.bitmap).offset);
-			// var firstframe = 0;
-			// if (element.symbol != null && element.symbol.loop != SingleFrame) {
-			// 	firstframe = firstFrame - frame.index;
-			// }
-			// var coloreffect = colorTransformsPool.get();
-			// coloreffect.concat(frame._colorEffect);
-			// coloreffect.concat(colorEffect);
-			// parseElement(element, firstframe, matrix, coloreffect);
-			// colorTransformsPool.put(coloreffect);
-		}
-	}
-
-	var atlas = charMap["Spectator"].sprite.animateAtlas;
-	var anim = atlas.anim;
-	anim.play("danceLeft");
-
-	/*if (instance.bitmap != null){
-		drawLimb(frames.getByName(instance.bitmap), matrix, colorEffect);
-
-		colorTransformsPool.put(colorEffect);
-		matrixesPool.put(matrix);
-		return;
-	}
-
-	var symbol = anim.symbolDictionary.get(anim.curInstance.symbol.name);
-	var firstFrame:Int = anim.curInstance.symbol.firstFrame + anim.curInstance.curFrame;
-
-	var layers = symbol.timeline.getList();
-	for (i in 0...layers.length)
-	{
-		var layer = layers[layers.length - 1 - i];
-
-		if (!layer.visible) continue;
-		var frame = layer.get(firstFrame);
-
-		trace(frame);
-		if (frame == null) continue;
-
-		for (element in frame.getList())
-		{
-			var firstframe = 0;
-			if (element.symbol != null && element.symbol.loop != Loop.SingleFrame)
-			{
-				firstframe = firstFrame - frame.index;
-			}
-
-			trace(element);
-			//parseElement(element, firstframe, matrix, coloreffect);
-		}
-	}
-
-	var dot = new FlxSprite(
-		charMap["Spectator"].sprite.animateAtlas.x,
-		charMap["Spectator"].sprite.animateAtlas.y
-	).makeGraphic(charMap["Spectator"].sprite.animateAtlas.width, charMap["Spectator"].sprite.animateAtlas.height, 0x80FFFFFF);
-	add(dot);*/
+	// var atlas = charMap["Spectator"].sprite.animateAtlas;
+	// atlas.parseElement(atlas.anim.curInstance, atlas.anim.curFrame, atlas._matrix, atlas.colorTransform, true);
+	// // trace(FlxAnimate.matrixesPool._pool[FlxAnimate.matrixesPool._count]);
+	// trace(FlxAnimate.matrixesPool);
 }
 
 function dropFile(file) {
@@ -318,7 +251,7 @@ function overlappingPoint() {
 	}
 
 	point = FlxG.mouse.getScreenPosition(FlxG.camera, point);
-	return editingSprite.sprite.getScreenBounds().containsPoint(point);
+	return editingSprite.sprite.getScreenBounds(null, FlxG.camera).containsPoint(point);
 }
 
 function update(e) {
@@ -374,6 +307,9 @@ function postUpdate(e) {
 	}
 
 	for (item in spriteMap.iterator()) {
+		var theA = item.button.colorTransform;
+		theA.redOffset = theA.greenOffset = theA.blueOffset = 50 * (editingSprite == item);
+
 		item.button.field.x += 10;
 		item.deleteButton.y = item.button.y + item.button.bHeight * 0.5 - item.deleteButton.bHeight * 0.5;
 		item.deleteIcon.y = item.deleteButton.y + 8;
@@ -384,8 +320,10 @@ function postUpdate(e) {
 	}
 
 	for (item in charMap.iterator()) {
-		item.button.field.x += 10;
+		var theA = item.button.colorTransform;
+		theA.redOffset = theA.greenOffset = theA.blueOffset = 50 * (editingSprite == item);
 
+		item.button.field.x += 10;
 		item.switchButton.y = item.button.y + item.button.bHeight * 0.5 - item.switchButton.bHeight * 0.5;
 		item.switchIcon.y = item.switchButton.y + 8;
 		item.editButton.y = item.switchButton.y;
@@ -417,6 +355,7 @@ function saveSprButton() {
 				}
 			}
 		}, 250, 54);
+		daButton.autoAlpha = false;
 		daButton.field.alignment = "left";
 		sprList.add(daButton);
 
@@ -426,6 +365,7 @@ function saveSprButton() {
 
 			var spr = spriteMap[sprName].sprite;
 			sprList.remove(daButton);
+			daButton.destroy();
 			spriteMap.remove(sprName);
 
 			for (i in 0...sprList.buttons.members.length) { //fix the ordering again
@@ -449,7 +389,8 @@ function saveSprButton() {
 		daButton.members.push(deleteIcon);
 
 		var childNodeButton = new UIButton(deleteButton.x - 36, deleteButton.y, "", function () {
-
+			editingSprite = spriteMap[daButton.field.text];
+			openSubState(new UISubstateWindow(true, "stageEditor/PropertyScreen"));
 		}, 32);
 		childNodeButton.autoAlpha = false;
 		daButton.members.push(childNodeButton);
@@ -505,6 +446,7 @@ function makeCharButton(name:String, node, color, character) {
 			}
 		}
 	}, 250, 54);
+	daButton.autoAlpha = false;
 	daButton.frames = Paths.getFrames("editors/ui/grayscale-button");
 	daButton.color = color;
 	daButton.field.alignment = "left";
@@ -573,6 +515,7 @@ function makeComboGroup(node) {
 			}
 		}
 	}, 250, 54);
+	daButton.autoAlpha = false;
 	daButton.frames = Paths.getFrames("editors/ui/grayscale-button");
 	daButton.color = 0xFFFEFEFE; //254 254 254 (button looping uses colors for checking if its a sprite or not)
 	daButton.field.alignment = "left";
@@ -654,9 +597,7 @@ function loadStage() {
 	}
 
 	var elems = [];
-	for(node in xml.children) {
-		if (node.nodeType != Xml.Element) continue;
-
+	for(node in xml.elements()) {
 		if (node.nodeName == "high-memory")
 			for(e in node.children)
 				elems.push(e);
@@ -667,7 +608,7 @@ function loadStage() {
 	for (node in elems) {
 		if (node.nodeType != Xml.Element) continue;
 
-		switch (node.nodeName) {
+		var sprite = switch (node.nodeName) {
 			case "sprite" | "spr" | "sparrow":
 				editingSprite = {
 					index: -1,
@@ -680,8 +621,10 @@ function loadStage() {
 			
 				editingSprite.sprite.shader = brightenShader;
 				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
 			case "box" | "solid":
 				trace("Boxes are currently unsupported!");
+				null;
 			case "boyfriend" | "bf" | "player":
 				var charX = (node.exists("x")) ? node.get("x") : 770;
 				var charY = (node.exists("y")) ? node.get("y") : 100;
@@ -689,6 +632,7 @@ function loadStage() {
 				var char = new Character(charX, charY, "bf", true);
 				char.shader = brightenShader;
 				makeCharButton("Player", node, 0xFF31B0D1, char);
+				char;
 			case "girlfriend" | "gf":
 				var charX = (node.exists("x")) ? node.get("x") : 400;
 				var charY = (node.exists("y")) ? node.get("y") : 130;
@@ -696,6 +640,7 @@ function loadStage() {
 				var char = new Character(charX, charY, "gf", false);
 				char.shader = brightenShader;
 				makeCharButton("Spectator", node, 0xFFA5004D, char);
+				char;
 			case "dad" | "opponent":
 				var charX = (node.exists("x")) ? node.get("x") : 100;
 				var charY = (node.exists("y")) ? node.get("y") : 100;
@@ -703,8 +648,15 @@ function loadStage() {
 				var char = new Character(charX, charY, "dad", false);
 				char.shader = brightenShader;
 				makeCharButton("Opponent", node, 0xFFAF66CE, char);
+				char;
 			case "ratings" | "combo":
 				makeComboGroup(node);
+				charMap["Combo Group"].sprite;
+		}
+
+		if (sprite != null) {
+			for(prop in node.elementsNamed("property"))
+				XMLUtil.applyXMLProperty(sprite, prop);
 		}
 	}
 

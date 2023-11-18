@@ -1,0 +1,408 @@
+var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScript.get("editingSprite");
+var stageGroup = FlxG.state.stateScript.get("stageGroup");
+var xml = FlxG.state.stateScript.get("xml");
+
+import Xml;
+import StringTools;
+import Reflect;
+var setField = Reflect.setField;
+
+import flixel.group.FlxTypedGroup;
+
+import funkin.editors.ui.UIState;
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+import funkin.editors.ui.UICheckbox;
+import funkin.editors.ui.UIDropDown;
+import funkin.editors.ui.UIButtonList;
+
+import haxe.xml.Printer;
+
+var nodeList:UIButtonList;
+var curNode = null;
+var childNodes = [];
+
+var propGroup:FlxTypedGroup;
+var propName:UITextBox;
+var propType:UIDropDown;
+var propValue:UITextBox;
+var propCheck:UICheckbox;
+
+var animGroup:FlxTypedGroup;
+var animName:UITextBox;
+var animPrefix:UITextBox;
+var animFPS:UITextBox; // yes, i know i can do a numeric stepper. but i want more control over when the value updates.
+var animLoop:UICheckbox;
+var animX:UITextBox;
+var animY:UITextBox;
+var animType:UIDropDown;
+
+function create() {
+	winTitle = 'Sprite ' + editingSprite.node.get("name") + ' extra nodes';
+	winWidth = 690;
+	winHeight = 390;
+}
+
+function createPost() {
+	var title = new UIText(windowSpr.x + 20, windowSpr.y + 30 + 16, 0, "Edit Extra Nodes", 28);
+	add(title);
+
+	nodeList = new UIButtonList(15, title.y + title.height + 36, 250, 259, "", FlxPoint.get(250, 54), null, 0);
+	nodeList.addButton.callback = function() {
+		makeNodeButton(Xml.createElement("property"), true);
+	}
+
+	for (node in editingSprite.node.elements()) {
+		if (node.nodeName == "property" || node.nodeName == "anim")
+			makeNodeButton(node, false);
+	}
+
+	add(nodeList);
+	nodeList.frames = Paths.getFrames('editors/ui/inputbox');
+
+	makePropGroup();
+	makeAnimGroup();
+
+	var saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20 - 125, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save & Close", function() {
+		updateBoxes();
+		saveProperties();
+		close();
+	}, 125);
+	add(saveButton);
+
+	var closeButton = new UIButton(saveButton.x - 20 - saveButton.bWidth, saveButton.y, "Close", function() {
+		close();
+	}, 125);
+	add(closeButton);
+	closeButton.color = 0xFFFF0000;
+}
+
+function addThingy(ui:UISprite, text:String, group) {
+	group.add(ui);
+	group.add(new UIText(ui.x, ui.y - 24, 0, text));
+}
+
+function makePropGroup() {
+	propGroup = new FlxTypedGroup();
+	add(propGroup);
+
+	propName = new UITextBox(nodeList.x + 265, nodeList.y + 60, "", 690 - 280 - 160);
+	addThingy(propName, "Property to Set", propGroup);
+
+	propType = new UIDropDown(propName.x + propName.bWidth + 10, propName.y, 160, 32, ["Float", "Int", "Bool", "String"], 0);
+	addThingy(propType, "Property Type", propGroup);
+
+	propValue = new UITextBox(propName.x, propName.y + 70, "", 390);
+	addThingy(propValue, "Property Value", propGroup);
+
+	propCheck = new UICheckbox(propName.x, propName.y + 70, "Enabled?");
+	propGroup.add(propCheck);
+
+	propGroup.visible = false;
+}
+
+function makeAnimGroup() {
+	animGroup = new FlxTypedGroup();
+	add(animGroup);
+
+	animName = new UITextBox(nodeList.x + 265, nodeList.y + 30, "", 150);
+	addThingy(animName, "Animation Name", animGroup);
+
+	animPrefix = new UITextBox(animName.x + animName.bWidth + 10, animName.y, "", 230);
+	addThingy(animPrefix, "Anim Name in XML", animGroup);
+
+	animFPS = new UITextBox(animName.x, animName.y + 70, "24", 50);
+	addThingy(animFPS, "FPS", animGroup);
+
+	animLoop = new UICheckbox(animFPS.x + animFPS.bWidth + 20, animFPS.y + 6, "Looped?");
+	animGroup.add(animLoop);
+
+	animX = new UITextBox(animLoop.x + 120, animFPS.y, "0", 55);
+	addThingy(animX, "Offset (X,Y)", animGroup);
+
+	animGroup.add(new UIText(animX.x + 84 - 26, animX.y + 9, 0, ",", 22));
+
+	animY = new UITextBox(animX.x + 84 - 32 + 26, animX.y, "0", 55);
+	animGroup.add(animY);
+
+	animType = new UIDropDown(animFPS.x, animFPS.y + 70, 150, 32, ["On Beat", "Looping", "None"], 0);
+	addThingy(animType, "Anim Type", animGroup);
+
+	animIndices = new UITextBox(animType.x + animType.bWidth + 10, animType.y, "", 260);
+	addThingy(animIndices, "Indices (Seperated by \",\")", animGroup);
+
+	animGroup.visible = false;
+}
+
+var callPost = true;
+var lastMoving;
+function update() {
+	if (callPost) {
+		callPost = false;
+		createPost();
+	}
+
+	lastMoving = nodeList.curMoving;
+}
+
+function postUpdate() {
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
+
+	if (lastMoving != null && lastMoving != nodeList.curMoving) {
+		var newNodes = [];
+
+		for (i in 0...nodeList.buttons.members.length) {
+			var button = nodeList.buttons.members[i];
+			var node = childNodes[button.ID];
+			newNodes.push(node);
+			button.ID = i;
+		}
+
+		childNodes = newNodes;
+	}
+
+	propGroup.visible = (curNode != null && curNode.nodeType == "property");
+	for (propObj in [propName, propType, propType.dropButton])
+		propObj.selectable = propGroup.visible;
+	propValue.selectable = propValue.visible = (propGroup.visible && propType.index != 2);
+	propCheck.selectable = propCheck.visible = (propGroup.visible && propType.index == 2);
+
+	animGroup.visible = (curNode != null && curNode.nodeType == "anim");
+	for (animObj in [animName, animPrefix, animFPS, animLoop, animX, animY, animType, animType.dropButton, animIndices])
+		animObj.selectable = animGroup.visible;
+
+	for (thingy in childNodes.iterator()) {
+		thingy.dropdown.y = thingy.button.y + 11;
+		thingy.deleteButton.y = thingy.button.y + thingy.button.bHeight * 0.5 - thingy.deleteButton.bHeight * 0.5;
+		thingy.deleteIcon.y = thingy.deleteButton.y + 8;
+	}
+}
+
+function updateBoxes() {
+	if (curNode == null) return;
+
+	var intStepper = (curNode.nodeType == "property" && propType.index == 1) ? propValue : animFPS;
+	var parsed = Std.parseFloat(intStepper.label.text);
+	intStepper.label.text = Math.isNaN(parsed) ? 0 : parsed;
+
+	var floatSteppers = (curNode.nodeType == "property" && propType.index == 0) ? [propValue, animX, animY] : [animX, animY];
+	for (stepper in floatSteppers) {
+		var parsed = Std.parseFloat(stepper.label.text);
+		stepper.label.text = Math.isNaN(parsed) ? 0 : parsed;
+	}
+
+	curNode.propData.name = propName.label.text;
+	curNode.propData.type = propType.index;
+	curNode.propData.value = (propType.index == 2) ? Std.string(propCheck.checked) : propValue.label.text;
+
+	curNode.animData.name = animName.label.text;
+	curNode.animData.prefix = animPrefix.label.text;
+	curNode.animData.fps = animFPS.label.text;
+	curNode.animData.loop = animLoop.checked;
+	curNode.animData.x = animX.label.text;
+	curNode.animData.y = animY.label.text;
+	curNode.animData.type = animType.index;
+	curNode.animData.indices = [];
+	for (num in animIndices.label.text.split(",")) {
+		num = StringTools.trim(num);
+		if (num == "") continue;
+
+		var parsed = Std.parseInt(num);
+		if (!Math.isNaN(parsed))
+			curNode.animData.indices.push(parsed);
+	}
+}
+
+function applyProperties() {
+	propName.label.text = curNode.propData.name;
+	propType.setOption(curNode.propData.type);
+	propValue.label.text = curNode.propData.value;
+	propCheck.checked = curNode.propData.value == "true";
+
+	animName.label.text = curNode.animData.name;
+	animPrefix.label.text = curNode.animData.prefix;
+	animFPS.label.text = curNode.animData.fps;
+	animLoop.checked = curNode.animData.loop;
+	animX.label.text = curNode.animData.x;
+	animY.label.text = curNode.animData.y;
+	animType.setOption(curNode.animData.type);
+	animIndices.label.text = curNode.animData.indices.join(", ");
+}
+
+function saveProperties() {
+	while (editingSprite.node.children.length > 0)
+		editingSprite.node.removeChild(editingSprite.node.children[0]);
+
+	for (node in childNodes) {
+		editingSprite.node.addChild(node.node);
+		node.node.nodeName = node.nodeType;
+		node.node.attributeMap = (node.nodeType == "property") ? [
+			"name" => node.propData.name,
+			"type" => ["float", "int", "bool", "string"][node.propData.type],
+			"value" => node.propData.value
+		] : [
+			"name" => node.animData.name,
+			"anim" => node.animData.prefix,
+			"fps" => node.animData.fps,
+			"loop" => Std.string(node.animData.loop),
+			"x" => node.animData.x,
+			"y" => node.animData.y
+			"type" => ["beat", "loop", "none"][node.animData.type]
+		];
+
+		if (node.nodeType != "property" && node.animData.indices.length > 0)
+			node.node.set("indices", node.animData.indices.join(", "));
+	}
+
+	if (editingSprite.sprite != null) {
+		stageGroup.remove(editingSprite.sprite, true);
+		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
+	}
+
+	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+	editingSprite.sprite.shader = brightenShader;
+	stageGroup.insert(editingSprite.index, editingSprite.sprite);
+
+	if (editingSprite.sprite != null) {
+		for(prop in editingSprite.node.elementsNamed("property"))
+			XMLUtil.applyXMLProperty(editingSprite.sprite, prop);
+	}
+}
+
+function makeNodeButton(node, isNew) {
+	var daButton;
+	daButton = new UIButton(0, 0, "", function() {
+		if (curNode != null) {
+			var theA = curNode.button.colorTransform;
+			theA.redOffset = theA.greenOffset = theA.blueOffset = 0;
+		}
+		updateBoxes();
+		curNode = childNodes[daButton.ID];
+		applyProperties();
+		var theA = curNode.button.colorTransform;
+		theA.redOffset = theA.greenOffset = theA.blueOffset = 50;
+	}, 250, 54);
+	daButton.autoAlpha = false;
+	daButton.ID = childNodes.length;
+	nodeList.add(daButton);
+	
+	var index = ["property", "anim"].indexOf(node.nodeName);
+	var dropdown = new UIDropDown(10, 11, 220, 32, ["Property", "Animation"], index);
+	dropdown.cameras = [nodeList.buttonCameras];
+	dropdown.onChange = function(index) {childNodes[daButton.ID].nodeType = ["property", "anim"][index];}
+	daButton.members.push(dropdown);
+
+	var deleteButton = new UIButton(daButton.x + daButton.bWidth - 42, daButton.bHeight/2 - 16, "", function () {
+		childNodes.splice(daButton.ID, 1);
+		nodeList.remove(daButton);
+		daButton.destroy();
+
+		for (i in 0...nodeList.buttons.members.length)
+			nodeList.buttons.members[i].ID = i;
+	}, 32);
+	deleteButton.color = 0xFFFF0000;
+	deleteButton.autoAlpha = false;
+	daButton.members.push(deleteButton);
+
+	var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+	deleteIcon.antialiasing = false;
+	daButton.members.push(deleteIcon);
+
+	var newNode = {
+		node: node,
+		button: daButton,
+		dropdown: dropdown,
+		deleteButton: deleteButton,
+		deleteIcon: deleteIcon,
+		nodeType: node.nodeName,
+		propData: {
+			name: "alpha",
+			type: 0,
+			value: "0.5" // haha string numbers
+		},
+		animData: {
+			name: "idle",
+			prefix: "idle",
+			fps: "24",
+			loop: false,
+			x: "0",
+			y: "0",
+			type: 0,
+			indices: []
+		}
+	};
+	childNodes.push(newNode);
+
+	if (isNew) return;
+
+	if (node.exists("type")) {
+		if (newNode.nodeType == "property") {
+			newNode.propData.type = switch(node.get("type").toLowerCase()) {
+				case "f" | "float" | "number":			0;
+				case "i" | "int" | "integer" | "color":	1;
+				case "b" | "bool" | "boolean":			2;
+				case "s" | "string" | "str" | "text":	3;
+			}
+		} else {
+			newNode.animData.type = ["beat", "loop", "none"].indexOf(node.get("type").toLowerCase());
+		}
+	}
+	if (node.exists("indices")) {
+		for (num in node.get("indices").split(",")) {
+			var parsed = Std.parseInt(StringTools.trim(num));
+			if (!Math.isNaN(parsed))
+				newNode.animData.indices.push(parsed);
+		}
+	}
+
+	var thingies = [
+		"name" => [((newNode.nodeType == "property") ? newNode.propData : newNode.animData), "name"],
+		"value" => [newNode.propData, "value"],
+		"anim" => [newNode.animData, "prefix"],
+		"fps" => [newNode.animData, "fps"],
+		"loop" => [newNode.animData, "loop"],
+		"x" => [newNode.animData, "x"],
+		"y" => [newNode.animData, "y"]
+	];
+	for (key in thingies.keys()) {
+		if (node.exists(key))
+			setField(thingies[key][0], thingies[key][1], node.get(key));
+	}
+	newNode.animData.loop = (newNode.animData.loop == "true");
+}
+
+var selectedDropdown;
+
+function onOpenSubState(event) {
+	var hiddenDropdown:Bool = (!propGroup.visible && FlxG.mouse.justReleased && (propType.hovered || propType.dropButton.hovered));
+	hiddenDropdown = hiddenDropdown || (!animGroup.visible && FlxG.mouse.justReleased && (animType.hovered || animType.dropButton.hovered));
+
+	if (hiddenDropdown) {
+		event.cancel();
+		UIState.state.curContextMenu = null;
+		return;
+	}
+
+	for (thingy in childNodes.iterator()) {
+		if (FlxG.mouse.justReleased && (thingy.dropdown.hovered || thingy.dropdown.dropButton.hovered)) {
+			selectedDropdown = thingy.dropdown;
+			event.substate.scriptName = "stageEditor/MoveableDropdown";
+
+			if (curNode != null) {
+				var theA = curNode.button.colorTransform;
+				theA.redOffset = theA.greenOffset = theA.blueOffset = 0;
+			}
+			updateBoxes();
+			curNode = thingy;
+			applyProperties();
+			var theA = curNode.button.colorTransform;
+			theA.redOffset = theA.greenOffset = theA.blueOffset = 50;
+
+			break;
+		}
+	}
+}

@@ -1,0 +1,18 @@
+var nodeList = FlxG.state.subState.stateScript.get("nodeList");
+var selectedDropdown = FlxG.state.subState.stateScript.get("selectedDropdown");
+
+var daPoint = FlxPoint.get();
+
+function postUpdate() {
+	daPoint = selectedDropdown.getScreenPosition(daPoint, (selectedDropdown.__lastDrawCameras[0] == null) ? FlxG.camera : selectedDropdown.__lastDrawCameras[0]);
+
+	bg.y = daPoint.y + selectedDropdown.bHeight;
+	var lastY = bg.y + 4;
+	for (item in contextMenuOptions) {
+		item.y = lastY;
+		lastY = item.y + item.bHeight;
+	}
+
+	contextCam.x = nodeList.buttonCameras.x;
+	contextCam.y = nodeList.buttonCameras.y;
+}

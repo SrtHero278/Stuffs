@@ -153,6 +153,11 @@ function createPost() {
 }
 
 function saveData() {
+	for (box in [posX, posY, scaleBox, scrollX, scrollY, zoomFactor, skewX, skewY, alphaBox]) {
+		if (box.onChange != null)
+			box.onChange(box.label.text); // workaround the fact the value property only gets set on unfocus.
+	}
+
 	var oldName = editingSprite.node.get("name");
 	var curNode = editingSprite.node;
 
@@ -186,6 +191,11 @@ function saveData() {
 	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
 	editingSprite.sprite.shader = brightenShader;
 	stageGroup.insert(editingSprite.index, editingSprite.sprite);
+
+	if (editingSprite.sprite != null) {
+		for(prop in editingSprite.node.elementsNamed("property"))
+			XMLUtil.applyXMLProperty(editingSprite.sprite, prop);
+	}
 }
 
 function update() {
