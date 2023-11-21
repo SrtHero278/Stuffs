@@ -81,42 +81,14 @@ function onDestroy() {
 }
 
 function changeChar() {
-	var char = FlxG.state.stateScript.get("editingSprite").sprite;
+	var char = FlxG.state.stateScript.get("editingSprite");
+	var stageGroup = FlxG.state.stateScript.get("stageGroup");
 
-	for (key in char.animOffsets.keys()) {
-		var point = char.animOffsets[key];
-		char.animOffsets.remove(key);
-		if(point != null)
-			point.put();
-	}
-	if (char.animateAtlas != null) {
-		char.animateAtlas.destroy();
-		char.animateAtlas = null;
-	}
-	char.curCharacter = tree.members[0].members[tree.members[0].curSelected].text; // hehe messiness on purpose ^v^
-	char.antialiasing = true;
+	var newChar = new Character(char.sprite.x, char.sprite.y, tree.members[0].members[tree.members[0].curSelected].text, char.sprite.isPlayer);
+	stageGroup.remove(char.sprite, true);
+	char.sprite.destroy();
+	char.sprite = newChar;
+	stageGroup.insert(char.index, char.sprite);
 
-	var xmlPath = Paths.xml('characters/' + char.curCharacter);
-	if (!Assets.exists(xmlPath)) {
-		char.curCharacter = "bf";
-		xmlPath = Paths.xml('characters/bf');
-	}
-
-	var plainXML = Assets.getText(xmlPath);
-
-	char.xml = Xml.parse(plainXML).firstElement();
-	if (char.xml == null) {
-		trace("\"character\" node was missing! Loading BF instead.");
-		char.curCharacter = "bf";
-		xmlPath = Paths.xml('characters/bf');
-		char.xml = Xml.parse(Assets.getText(xmlPath)).firstElement();
-	}
-
-	char.script = Script.create(Paths.script(Path.withoutExtension(xmlPath), null, true));
-	char.script.setParent(char);
-	char.script.load();
-	char.applyXML(char.xml);
-	char.script.call("create");
-	char.script.call("postCreate");
 	close();
 }

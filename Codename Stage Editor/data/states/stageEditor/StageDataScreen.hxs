@@ -1,0 +1,124 @@
+var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var xml = FlxG.state.stateScript.get("xml");
+var stageGroup = FlxG.state.stateScript.get("stageGroup");
+
+var sprList = FlxG.state.stateScript.get("sprList");
+var spriteMap = FlxG.state.stateScript.get("spriteMap");
+var charMap = FlxG.state.stateScript.get("charMap");
+
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+import funkin.editors.ui.UINumericStepper;
+
+var folderTextBox:UITextBox;
+var folderTxt:UIText;
+var zoomBox:UINumericStepper;
+
+function create() {
+	winTitle = 'Stage Properties';
+	
+	winWidth = 350;
+	winHeight = 200;
+}
+
+function createPost() {
+	function addLabelOn(ui, text:String) {
+		var txt = new UIText(ui.x, ui.y - 5, 0, text);
+		txt.y -= txt.height;
+		add(txt);
+		return txt;
+	}
+
+	var folder = xml.exists("folder") ? xml.get("folder") : "";
+	folderTextBox = new UITextBox(windowSpr.x + 20, windowSpr.y + 80, folder, 240);
+	add(folderTextBox);
+	folderTxt = addLabelOn(folderTextBox, "Image Folder\n(images/" + folder + ")");
+
+	var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+	zoomBox = new UINumericStepper(folderTextBox.x + folderTextBox.bWidth + 10, folderTextBox.y, zoom, 0.001, 2, null, null, 84);
+	add(zoomBox);
+	addLabelOn(zoomBox, "Zoom");
+
+	var saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save", function() {
+		saveProperties();		
+		close();
+	}, 75);
+	add(saveButton);
+	saveButton.frames = Paths.getFrames("editors/ui/grayscale-button");
+	saveButton.color = 0xFF00FF00;
+	saveButton.x -= saveButton.bWidth;
+
+	var closeButton = new UIButton(saveButton.x - 20, saveButton.y, "Cancel", function() {
+		close();
+	}, 75);
+	add(closeButton);
+	closeButton.frames = Paths.getFrames("editors/ui/grayscale-button");
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+}
+
+function saveProperties() {
+	var spritesParentFolder = folderTextBox.label.text;
+	if (spritesParentFolder.charAt(spritesParentFolder.length-1) != "/")
+		spritesParentFolder = spritesParentFolder + "/";
+
+	var oldFolder = (xml.exists("folder")) ? xml.get("folder") : "";
+	if (oldFolder != spritesParentFolder) {
+		xml.set("folder", spritesParentFolder);
+
+		for (button in sprList.buttons.members) {
+			var sprName = button.field.text;
+
+			if (button.color == 0xFFFFFF) {
+				var node = spriteMap[sprName].node;
+
+				stageGroup.remove(spriteMap[sprName].sprite, true);
+				spriteMap[sprName].sprite.destroy();
+
+				if (!Assets.exists(Paths.image(spritesParentFolder + node.get("sprite"), null, true))) { // if the game cant find the png in the new folder, it will try to go back to the old folder.
+					node.set("sprite", oldFolder + node.get("sprite"));
+					var index = spritesParentFolder.indexOf("/");
+					while (index > -1) {
+						node.set("sprite", "../" + node.get("sprite"));
+						index = spritesParentFolder.indexOf("/", index + 1);
+					}
+				}
+					
+				spriteMap[sprName].sprite = XMLUtil.createSpriteFromXML(node, spritesParentFolder);
+				spriteMap[sprName].sprite.shader = brightenShader;
+				stageGroup.insert(spriteMap[sprName].index, spriteMap[sprName].sprite);
+
+				if (spriteMap[sprName].sprite != null) {
+					for(prop in node.elementsNamed("property"))
+						XMLUtil.applyXMLProperty(spriteMap[sprName].sprite, prop);
+				}
+			}
+		}
+	}
+
+	if (zoomBox.onChange != null)
+		zoomBox.onChange(zoomBox.label.text); // workaround the fact the value property only gets set on unfocus.
+	xml.set("zoom", zoomBox.value);
+
+	for (mem in stageGroup.members) {
+		if (Std.isOfType(mem, FunkinSprite))
+			mem.initialZoom = zoomBox.value;
+	}
+}
+
+var callPost:Bool = true;
+function update() {
+	if (callPost) {
+		callPost = false;
+		createPost();
+	}
+
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
+}
+
+function postUpdate() {
+	folderTxt.text = "Image Folder\n(images/" + folderTextBox.label.text + ")";
+}

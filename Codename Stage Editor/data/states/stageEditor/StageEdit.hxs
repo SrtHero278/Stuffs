@@ -115,13 +115,55 @@ function create() {
 			]
 		},
 		{
-			label: "Sprites",
+			label: "Edit",
 			childs: [
+				{
+					label: "Stage Properties",
+					onSelect: function(_) {
+						editingSprite = null;
+						openSubState(new UISubstateWindow(true, "stageEditor/StageDataScreen"));
+					}
+				},
 				{
 					label: "New Sprite",
 					onSelect: function(_) {
 						editingSprite = null;
 						openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+					}
+				}
+			]
+		},
+		{
+			label: "View",
+			childs: [
+				{
+					label: "View from Player",
+					onSelect: function(_) {
+						var pos = charMap["Player"].sprite.getCameraPosition();
+						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
+						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
+						pos.put();
+					}
+				},
+				{
+					label: "View from Spectator",
+					onSelect: function(_) {
+						var pos = charMap["Spectator"].sprite.getCameraPosition();
+						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
+						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
+						pos.put();
+					}
+				},
+				{
+					label: "View from Opponent",
+					onSelect: function(_) {
+						var pos = charMap["Opponent"].sprite.getCameraPosition();
+						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
+						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
+						pos.put();
 					}
 				}
 			]
@@ -596,6 +638,8 @@ function loadStage() {
 		xml.set("folder", spritesParentFolder);
 	}
 
+	FlxG.camera.zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+
 	var elems = [];
 	for(node in xml.elements()) {
 		if (node.nodeName == "high-memory")
@@ -655,6 +699,8 @@ function loadStage() {
 		}
 
 		if (sprite != null) {
+			if (Std.isOfType(sprite, FunkinSprite))
+				sprite.initialZoom = FlxG.camera.zoom;
 			for(prop in node.elementsNamed("property"))
 				XMLUtil.applyXMLProperty(sprite, prop);
 		}
