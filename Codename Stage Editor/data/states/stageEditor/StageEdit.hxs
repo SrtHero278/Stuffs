@@ -235,9 +235,9 @@ function dropFile(file) {
 	var sprName = Path.withoutDirectory(Path.withoutExtension(file));
 
 	if (subState != null && subState.scriptName == "stageEditor/SpriteScreen") {
-		if (subState.stateScript.get("newSprite"))
-			subState.stateScript.get("nameTextBox").label.text = sprName;
-		subState.stateScript.get("fileTextBox").label.text = sprName;
+		if (subState.stateScripst.get("newSprite"))
+			subState.stateScripts.get("nameTextBox").label.text = sprName;
+		subState.stateScripts.get("fileTextBox").label.text = sprName;
 	} else {
 		if (spriteMap.exists(sprName)) {
 			editingSprite = spriteMap[sprName];

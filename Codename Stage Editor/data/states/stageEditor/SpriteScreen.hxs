@@ -184,7 +184,7 @@ function saveData() {
 		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
 	}
 
-	FlxG.state.stateScript.set("editingSprite", editingSprite);
+	FlxG.state.stateScripts.set("editingSprite", editingSprite);
 	FlxG.state.call("saveSprButton");
 	spriteMap.set(editingSprite.node.get("name"), editingSprite);
 
