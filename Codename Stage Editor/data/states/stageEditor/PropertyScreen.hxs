@@ -1,8 +1,8 @@
-var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
 
-var editingSprite = FlxG.state.stateScript.get("editingSprite");
-var stageGroup = FlxG.state.stateScript.get("stageGroup");
-var xml = FlxG.state.stateScript.get("xml");
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
 
 import Xml;
 import StringTools;
@@ -46,7 +46,7 @@ function create() {
 	winHeight = 390;
 }
 
-function createPost() {
+function postCreate() {
 	var title = new UIText(windowSpr.x + 20, windowSpr.y + 30 + 16, 0, "Edit Extra Nodes", 28);
 	add(title);
 
@@ -137,21 +137,15 @@ function makeAnimGroup() {
 	animGroup.visible = false;
 }
 
-var callPost = true;
 var lastMoving;
 function update() {
-	if (callPost) {
-		callPost = false;
-		createPost();
-	}
-
 	lastMoving = nodeList.curMoving;
+
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
 }
 
 function postUpdate() {
-	if (FlxG.keys.justPressed.ESCAPE)
-		close();
-
 	if (lastMoving != null && lastMoving != nodeList.curMoving) {
 		var newNodes = [];
 

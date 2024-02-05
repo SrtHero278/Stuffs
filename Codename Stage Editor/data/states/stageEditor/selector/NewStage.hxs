@@ -14,7 +14,7 @@ function create() {
 	winHeight = 150;
 }
 
-function createPost() {
+function postCreate() {
 	function addLabelOn(ui, text:String)
 		add(new UIText(ui.x, ui.y - 24, 0, text));
 
@@ -47,15 +47,4 @@ function createPost() {
 	closeButton.frames = Paths.getFrames("editors/ui/grayscale-button");
 	closeButton.color = 0xFFFF0000;
 	closeButton.x -= closeButton.bWidth;
-}
-
-var callPost:Bool = true;
-function update() {
-	if (callPost) {
-		callPost = false;
-		createPost();
-	}
-
-	if (FlxG.keys.justPressed.ESCAPE)
-		close();
 }

@@ -72,7 +72,7 @@ function update(e) {
 		close();
 }
 
-function onDestroy() {
+function destroy() {
 	for(e in camShaders)
 		e.removeShader(blurShader);
 	blurShader = null;
@@ -81,8 +81,8 @@ function onDestroy() {
 }
 
 function changeChar() {
-	var char = FlxG.state.stateScript.get("editingSprite");
-	var stageGroup = FlxG.state.stateScript.get("stageGroup");
+	var char = FlxG.state.stateScripts.get("editingSprite");
+	var stageGroup = FlxG.state.stateScripts.get("stageGroup");
 
 	var newChar = new Character(char.sprite.x, char.sprite.y, tree.members[0].members[tree.members[0].curSelected].text, char.sprite.isPlayer);
 	stageGroup.remove(char.sprite, true);

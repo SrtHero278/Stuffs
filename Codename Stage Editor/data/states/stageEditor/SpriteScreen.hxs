@@ -1,10 +1,10 @@
-var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
 
-var editingSprite = FlxG.state.stateScript.get("editingSprite");
-var stageGroup = FlxG.state.stateScript.get("stageGroup");
-var xml = FlxG.state.stateScript.get("xml");
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
 
-var spriteMap = FlxG.state.stateScript.get("spriteMap");
+var spriteMap = FlxG.state.stateScripts.get("spriteMap");
 
 import Xml;
 import Reflect;
@@ -49,7 +49,7 @@ function create() {
 	winTitle = newSprite ? 'Creating Sprite' : 'Sprite ' + editingSprite.node.get("name") + ' properties';
 }
 
-function createPost() {
+function postCreate() {
 	function addLabelOn(ui, text:String)
 		add(new UIText(ui.x, ui.y - 24, 0, text));
 
@@ -196,16 +196,6 @@ function saveData() {
 		for(prop in editingSprite.node.elementsNamed("property"))
 			XMLUtil.applyXMLProperty(editingSprite.sprite, prop);
 	}
-}
-
-function update() {
-	if (callPost) {
-		callPost = false;
-		createPost();
-	}
-
-	if (FlxG.keys.justPressed.ESCAPE)
-		close();
 }
 
 function setNodeList() {

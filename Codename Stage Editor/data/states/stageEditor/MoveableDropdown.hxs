@@ -1,5 +1,5 @@
-var nodeList = FlxG.state.subState.stateScript.get("nodeList");
-var selectedDropdown = FlxG.state.subState.stateScript.get("selectedDropdown");
+var nodeList = FlxG.state.subState.stateScripts.get("nodeList");
+var selectedDropdown = FlxG.state.subState.stateScripts.get("selectedDropdown");
 
 var daPoint = FlxPoint.get();
 
@@ -13,6 +13,5 @@ function postUpdate() {
 		lastY = item.y + item.bHeight;
 	}
 
-	contextCam.x = nodeList.buttonCameras.x;
 	contextCam.y = nodeList.buttonCameras.y;
 }

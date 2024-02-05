@@ -264,7 +264,7 @@ function dropFile(file) {
 	Lib.current.stage.window.focus();
 }
 
-function onDestroy() {
+function destroy() {
 	Lib.current.stage.window.onDropFile.remove(dropFile);
 }
 

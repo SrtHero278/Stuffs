@@ -1,11 +1,11 @@
-var brightenShader = FlxG.state.stateScript.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
 
-var xml = FlxG.state.stateScript.get("xml");
-var stageGroup = FlxG.state.stateScript.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
 
-var sprList = FlxG.state.stateScript.get("sprList");
-var spriteMap = FlxG.state.stateScript.get("spriteMap");
-var charMap = FlxG.state.stateScript.get("charMap");
+var sprList = FlxG.state.stateScripts.get("sprList");
+var spriteMap = FlxG.state.stateScripts.get("spriteMap");
+var charMap = FlxG.state.stateScripts.get("charMap");
 
 import funkin.editors.ui.UIText;
 import funkin.editors.ui.UIButton;
@@ -23,7 +23,7 @@ function create() {
 	winHeight = 200;
 }
 
-function createPost() {
+function postCreate() {
 	function addLabelOn(ui, text:String) {
 		var txt = new UIText(ui.x, ui.y - 5, 0, text);
 		txt.y -= txt.height;
@@ -108,17 +108,8 @@ function saveProperties() {
 	}
 }
 
-var callPost:Bool = true;
-function update() {
-	if (callPost) {
-		callPost = false;
-		createPost();
-	}
-
-	if (FlxG.keys.justPressed.ESCAPE)
-		close();
-}
-
 function postUpdate() {
 	folderTxt.text = "Image Folder\n(images/" + folderTextBox.label.text + ")";
+	if (FlxG.keys.justPressed.ESCAPE)
+		close();
 }
