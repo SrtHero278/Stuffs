@@ -67,9 +67,9 @@ function update(elapsed:Float) {
 
 		var boolIndex = [(curSelected == 0), (curSelected == 1), (curSelected == 2), true].indexOf(true);
 		var charArray = [
-			PlayState.instance.boyfriend.curCharacter,
-			PlayState.instance.gf.curCharacter,
-			PlayState.instance.dad.curCharacter, 
+			PlayState.instance.boyfriend?.curCharacter ?? "bf",
+			PlayState.instance.gf?.curCharacter ?? "gf",
+			PlayState.instance.dad?.curCharacter ?? "dad", 
 			chars[curSelected]
 		];
 		Script.staticVariables.set("daAnim", charArray[boolIndex]);
