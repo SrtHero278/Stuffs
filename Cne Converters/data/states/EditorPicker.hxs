@@ -1,0 +1,33 @@
+import funkin.editors.EditorTreeMenu;
+import flixel.effects.FlxFlicker;
+
+var converterIndex = -1;
+
+function create() {
+	options.push({
+		name: "Cne Converters",
+		iconID: 0,
+		state: EditorTreeMenu
+	});
+	converterIndex = options.length - 1;
+}
+
+function postCreate() {
+	sprites[converterIndex].iconSpr.loadGraphic(Paths.image("converterIcon"));
+}
+
+var overrodeFlicker = false;
+function update() {
+	if (converterIndex <= -1 || overrodeFlicker) return;
+
+	if (curSelected == converterIndex && selected && FlxFlicker.isFlickering(sprites[converterIndex].label)) {
+		FlxFlicker._boundObjects[sprites[converterIndex].label].completionCallback = function(flick) {
+			subCam.fade(0xFF000000, 0.25, false, function() {
+				var state = new EditorTreeMenu();
+				state.scriptName = "CneConvert"; // OVERRIDING NEW AIANT GON STOP ME OPTIONS.TREEMENU
+				FlxG.switchState(state);
+			});
+		}
+		overrodeFlicker = true;
+	}
+}

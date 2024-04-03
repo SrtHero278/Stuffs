@@ -1,0 +1,670 @@
+import haxe.io.Path;
+
+import funkin.menus.FreeplaySonglist;
+import funkin.menus.MainMenuState;
+import funkin.backend.system.framerate.Framerate;
+import funkin.options.type.ArrayOption;
+import funkin.options.type.TextOption;
+import funkin.options.type.IconOption;
+import funkin.options.type.NumOption;
+import funkin.options.OptionsScreen;
+import funkin.editors.EditorTreeMenu;
+import funkin.editors.ui.UIWarningSubstate;
+import funkin.editors.ui.UIState;
+import funkin.backend.chart.Chart;
+import lime.ui.FileDialog;
+import lime.ui.FileDialogType;
+import haxe.xml.Printer;
+import sys.io.File;
+import StringTools;
+import Reflect;
+import Float;
+import Xml;
+
+var defaultSettings = [
+	"sectionSnapping" => 32,
+	"snappingMethod" => "floor",
+	"sectionThreshold" => 5
+];
+var curFunc = "UNKNOWN";
+
+bgType = "charter";
+
+function create() {
+	curFunc = "create";
+
+	for (key in defaultSettings.keys()) {
+		if (!Reflect.hasField(FlxG.save.data, "CNEC_" + key))
+			Reflect.setField(FlxG.save.data, "CNEC_" + key, defaultSettings[key]);
+	}
+
+	Framerate.offset.y = 60;
+
+	var list = [
+		new TextOption("Convert Chart", "Press ACCEPT to convert a chart.",
+		function() {
+			var subList = [
+				new TextOption("Cne to Psych", "Press ACCEPT to convert to a psych chart.", function()
+					openChartList("Cne to Psych", CHART_cneToPsych)
+				)
+			];
+
+			optionsTree.add(new OptionsScreen("Convert Chart", "Select a converter method.", subList));
+		}),
+		new TextOption("Convert Characters", "Press ACCEPT to convert a character.",
+		function() {
+			var subList = [
+				new TextOption("Psych to Cne", "Press ACCEPT to convert from a psych character.", CHARACTER_psychToCne),
+				new TextOption("Cne to Psych", "Press ACCEPT to convert to a psych character.", function()
+					openCharacterList("Cne to Psych", CHARACTER_cneToPsych)
+				),
+				new TextOption("Yoshi to Cne", "Press ACCEPT to convert from a yoshi character.", CHARACTER_yoshiToCne),
+				new TextOption("Cne to Yoshi", "Press ACCEPT to convert to a yoshi character.", function()
+					openCharacterList("Cne to Yoshi", CHARACTER_cneToYoshi)
+				)
+			];
+
+			optionsTree.add(new OptionsScreen("Convert Chart", "Select a converter method.", subList));
+		}),
+		new TextOption("Converter Options", "Press ACCEPT to adjust the converters.", openOptions)
+	];
+
+
+	main = new OptionsScreen("Cne Converters", "Select a Converter.", list);
+
+	__script__.interp.errorHandler = function(err) {
+		err.origin = curFunc;
+		onPanic(err.toString());
+	};
+}
+
+function onPanic(error) {
+	var msg = "The converter has came across an error and cannot convert properly.\n\n" + error;
+
+	var substate;
+	substate = new UIWarningSubstate("Failed to Convert!", msg, [
+		{
+			label: "Exit State",
+			onClick: function(t) {
+				FlxG.switchState(new MainMenuState());
+			}
+		},
+		{
+			label: "Reload State",
+			onClick: function(t) {
+				var state = new EditorTreeMenu();
+				state.scriptName = "CneConvert";
+				FlxG.switchState(state);
+			}
+		},
+		{
+			label: "Ignore Error",
+			onClick: function(t) {
+				substate.close();
+			}
+		}
+	]);
+
+	openSubState(substate);
+}
+
+function openOptions() {
+	curFunc = "openOptions";
+
+	var list = [
+		new NumOption("Section Snapping", "Snap the length of each section to prevent awkward section lengths.", 4, 128, 4, "CNEC_sectionSnapping", null, FlxG.save.data),
+		new ArrayOption("Snapping Method", "Decide whether to round or floor the section snapping.", ["floor", "round"], ["Floor", "Round"], "CNEC_snappingMethod", null, FlxG.save.data)
+		new NumOption("Section Threshold", "Add extra padding to determine when a note or event has passed a section.", 0, 100, 1, "CNEC_sectionThreshold", null, FlxG.save.data),
+	];
+
+	optionsTree.add(new OptionsScreen("Converter Options", "Change options for the converters.", list));
+}
+
+function openChartList(name, func) {
+	curFunc = "openChartList";
+
+	freeplayList = new FreeplaySonglist();
+	freeplayList.getSongsFromSource(null, false);
+
+	var list = [
+		for(song in freeplayList.songs) new IconOption(song.name, "Press ACCEPT to choose a difficulty to convert.", song.icon, function() {
+			var diffList = [
+				for(diff in song.difficulties) if (diff != "") 
+					new TextOption(diff, "Press ACCEPT to convert the chart for the selected difficulty.", function() 
+						func(song.name, diff)
+					)
+			];
+
+			optionsTree.add(new OptionsScreen(song.name, "Select a difficulty to convert.", diffList));
+		})
+	];
+
+	optionsTree.add(new OptionsScreen(name, "Select a chart to convert.", list));
+}
+
+function openCharacterList(name, func) {
+	curFunc = "openCharacterList";
+
+	var list = [
+		for(char in Character.getList(false)) new IconOption(char, "Press ACCEPT to convert the character.",  Character.getIconFromCharName(char), function()
+			func(char), -1)
+	];
+
+	optionsTree.add(new OptionsScreen(name, "Select a character to convert.", list));
+}
+
+function CHART_cneToPsych(song, diff) {
+	curFunc = "CHART_cneToPsych";
+
+	var json = Chart.parse(song, diff);
+	var psychJson = {
+		song: json.meta.name,
+		notes: [],
+		events: [],
+		bpm: json.meta.bpm,
+		needsVoices: json.meta.needsVoices,
+		speed: json.scrollSpeed,
+		player1: "bf",
+		player2: "pico",
+		gfVersion: "gf",
+		stage: "stage"
+	};
+	var curSpeed = json.scrollSpeed;
+	var mustHit = false;
+	var queueBPMChange = false;
+	var curBPM = json.meta.bpm;
+	var songTime = 0;
+	var measureTimes = [0];
+	var altEvents = [for (i in 0...json.strumLines.length) [{time: 0, anim: false, idle: false}]];
+
+	function addSections(tilTime, onPassedTime) {
+		if (songTime + FlxG.save.data.CNEC_sectionThreshold >= tilTime) {
+			onPassedTime();
+			return;
+		}
+
+		var crochet = 60.0 / curBPM * 1000.0;
+		var beats = (tilTime - measureTimes[measureTimes.length - 1]) / crochet;
+		var snapMethod = (FlxG.save.data.CNEC_snappingMethod == "round") ? Math.round : Math.floor;
+		beats = snapMethod(beats / (4 / FlxG.save.data.CNEC_sectionSnapping)) * (4 / FlxG.save.data.CNEC_sectionSnapping);
+
+		for (i in 0...Math.ceil(beats / json.meta.beatsPerMeasure)) {
+			psychJson.notes.push({
+				sectionNotes: [],
+				sectionBeats: (i == 0 && beats % json.meta.beatsPerMeasure > 0) ? beats % json.meta.beatsPerMeasure : json.meta.beatsPerMeasure,
+				mustHitSection: mustHit,
+				gfSection: false,
+				bpm: curBPM,
+				changeBPM: queueBPMChange,
+				altAnim: false
+			});
+			queueBPMChange = false;
+			songTime += psychJson.notes[psychJson.notes.length - 1].sectionBeats * crochet;
+			measureTimes.push(songTime);
+		}
+		onPassedTime();
+	}
+	json.events.sort(function(ev1, ev2)
+		return Math.floor(ev1.time - ev2.time)
+	);
+
+	for (event in json.events) {
+		switch (event.name) {
+			case "Camera Movement":
+				addSections(event.time, function() {
+					var charPosName = json.strumLines[event.params[0]].position ?? switch(json.strumLines[event.params[0]].type) {
+						case 0: "dad";
+						case 1: "boyfriend";
+						case 2: "girlfriend";
+					};
+		
+					mustHit = charPosName == "boyfriend";
+				});
+			case "BPM Change":
+				addSections(event.time, function() {
+					curBPM = event.params[0];
+					queueBPMChange = true;
+				});
+			case "Add Camera Zoom":
+				var psychEvent = ["Add Camera Zoom", event.params[0] * (event.params[1] == "camGame"), event.params[0] * (event.params[1] == "camHUD")];
+
+				if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+					psychJson.events.push([event.time, [psychEvent]]);
+				else
+					psychJson.events[psychJson.events.length - 1][1].push(psychEvent);
+			case "Scroll Speed Change":
+				if (curSpeed == event.params[1]) continue;
+
+				var psychEvent = ["Change Scroll Speed", event.params[1] / curSpeed, event.params[2] / (60 / curBPM * 1000.0) * json.meta.stepsPerBeat];
+				curSpeed = event.params[1];
+
+				if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+					psychJson.events.push([event.time, [psychEvent]]);
+				else
+					psychJson.events[psychJson.events.length - 1][1].push(psychEvent);
+			case "Play Animation":
+				var psychEvent = ["Play Animation", event.params[1], json.strumLines[event.params[0]].type];
+
+				if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+					psychJson.events.push([event.time, [psychEvent]]);
+				else
+					psychJson.events[psychJson.events.length - 1][1].push(psychEvent);
+			case "Alt Animation Toggle":
+				if (event.time == 0) {
+					altEvents[event.params[2]][0].anim = event.params[0];
+					altEvents[event.params[2]][1].idle = event.params[1];
+					if (event.params[1]) {
+						var psychEvent = ["Alt Idle Animation", Std.string(json.strumLines[event.params[0]].type), "-alt"];
+
+						if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+							psychJson.events.push([event.time, [psychEvent]]);
+						else
+							psychJson.events[psychJson.events.length - 1][1].push(psychEvent);
+					}
+					continue;
+				}
+
+				altEvents[event.params[2]].push({
+					time: event.time,
+					anim: event.params[0],
+					idle: event.params[1]
+				});
+
+				if (altEvents[event.params[2]][altEvents[event.params[2]].length - 1].idle != event.params[1]) {
+					var psychEvent = ["Alt Idle Animation", Std.string(json.strumLines[event.params[0]].type), (event.params[1]) ? "-alt" : ""];
+
+					if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+						psychJson.events.push([event.time, [psychEvent]]);
+					else
+						psychJson.events[psychJson.events.length - 1][1].push(psychEvent);
+				}
+			default:
+				var val1 = [for (i in 0...Math.ceil(event.params.length * 0.5))
+					Std.string(event.params[i])
+				].join(", ");
+				
+				var val2 = [for (i in Math.ceil(event.params.length * 0.5)...event.params.length)
+					Std.string(event.params[i])
+				].join(", ");
+		
+				if (psychJson.events.length <= 0 || Math.round(psychJson.events[psychJson.events.length - 1][0]) != Math.round(event.time))
+					psychJson.events.push([event.time, [[event.name, val1, val2]]]);
+				else
+					psychJson.events[psychJson.events.length - 1][1].push([event.name, val1, val2]);
+		}
+	}
+	psychJson.notes.push({
+		sectionNotes: [],
+		sectionBeats: json.meta.beatsPerMeasure,
+		mustHitSection: mustHit,
+		gfSection: false,
+		bpm: curBPM,
+		changeBPM: queueBPMChange,
+		altAnim: false
+	});
+
+	var charDone = [false, false, false];
+	for (s in 0...json.strumLines.length) {
+		var strum = json.strumLines[s];
+		if (charDone[strum.type]) return;
+
+		var altIndex = 0;
+		var measureIndex = 0;
+		curBPM = json.meta.bpm;
+		charDone[strum.type] = true;
+
+		strum.notes.sort(function(note1, note2)
+			return Math.floor(note1.time - note2.time)
+		);
+
+		switch (strum.type) {
+			case 0:
+				psychJson.player2 = strum.characters[0];
+				
+				for (note in strum.notes) {
+					while (songTime <= note.time) {
+						songTime += 60.0 / curBPM * 1000.0 * json.meta.beatsPerMeasure;
+						measureTimes.push(songTime);
+						psychJson.notes.push({
+							sectionNotes: [],
+							sectionBeats: json.meta.beatsPerMeasure,
+							mustHitSection: mustHit,
+							gfSection: false,
+							bpm: curBPM,
+							changeBPM: false,
+							altAnim: false
+						});
+					}
+					while (measureTimes.length > measureIndex && measureTimes[measureIndex] <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						measureIndex++;
+					while (altEvents[s].length > altIndex && altEvents[s][altIndex].time <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						altIndex++;
+
+					var psychNote = [note.time, note.id + 4 * psychJson.notes[measureIndex - 1].mustHitSection, note.sLen];
+					if (note.type > 0)
+						psychNote.push(json.noteTypes[note.type]);
+					if (altEvents[s][altIndex - 1].anim)
+						psychNote[3] = "Alt Animation";
+					psychJson.notes[measureIndex - 1].sectionNotes.push(psychNote);
+				}
+			case 1:
+				psychJson.player1 = strum.characters[0];
+
+				for (note in strum.notes) {
+					while (songTime <= note.time) {
+						songTime += 60.0 / curBPM * 1000.0 * json.meta.beatsPerMeasure;
+						measureTimes.push(songTime);
+						psychJson.notes.push({
+							sectionNotes: [],
+							sectionBeats: json.meta.beatsPerMeasure,
+							mustHitSection: mustHit,
+							gfSection: false,
+							bpm: curBPM,
+							changeBPM: false,
+							altAnim: false
+						});
+					}
+					while (measureTimes.length > measureIndex && measureTimes[measureIndex] <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						measureIndex++;
+					while (altEvents[s].length > altIndex && altEvents[s][altIndex].time <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						altIndex++;
+
+					var psychNote = [note.time, note.id + 4 * !psychJson.notes[measureIndex - 1].mustHitSection, note.sLen];
+					if (note.type > 0)
+						psychNote.push(json.noteTypes[note.type]);
+					if (altEvents[s][altIndex - 1].anim)
+						psychNote[3] = "Alt Animation";
+					psychJson.notes[measureIndex - 1].sectionNotes.push(psychNote);
+				}
+			case 2:
+				psychJson.gfVersion = strum.characters[0];
+
+				for (note in strum.notes) {
+					while (songTime <= note.time) {
+						songTime += 60.0 / curBPM * 1000.0 * json.meta.beatsPerMeasure;
+						measureTimes.push(songTime);
+						psychJson.notes.push({
+							sectionNotes: [],
+							sectionBeats: json.meta.beatsPerMeasure,
+							mustHitSection: mustHit,
+							gfSection: false,
+							bpm: curBPM,
+							changeBPM: false,
+							altAnim: false
+						});
+					}
+					while (measureTimes.length > measureIndex && measureTimes[measureIndex] <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						measureIndex++;
+					while (altEvents[s].length > altIndex && altEvents[s][altIndex].time <= note.time + FlxG.save.data.CNEC_sectionThreshold)
+						altIndex++;
+
+					var psychNote = [note.time, note.id + 4 * psychJson.notes[measureIndex - 1].mustHitSection, note.sLen];
+					if (note.type > 0)
+						psychNote.push(json.noteTypes[note.type]);
+					if (altEvents[s][altIndex - 1].anim)
+						psychNote[3] = "Alt Animation";
+					psychJson.notes[measureIndex - 1].sectionNotes.push(psychNote);
+				}
+		}
+	}
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		File.saveContent(file, Json.stringify({song: psychJson}, null, "\t"));
+	});
+	dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Psych Chart JSON.');
+}
+
+function CHARACTER_psychToCne() {
+	curFunc = "CHARACTER_psychToCne";
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		var parsedJson = Json.parse(File.getContent(file));
+
+		var xml = Xml.createDocument();
+		xml.addChild(Xml.createDocType("codename-engine-character"));
+
+		var charNode = Xml.createElement("character");
+		xml.addChild(charNode);
+
+		if (parsedJson.position != null && parsedJson.position.length > 0 && parsedJson.position[0] != 0)
+			charNode.set("x", Std.string(parsedJson.position[0]));
+		if (parsedJson.position != null && parsedJson.position.length > 1 && parsedJson.position[1] != 0)
+			charNode.set("y", Std.string(parsedJson.position[1]));
+
+		if (parsedJson.camera_position != null && parsedJson.camera_position.length > 0 && parsedJson.camera_position[0] != 0)
+			charNode.set("camx", Std.string(parsedJson.camera_position[0]));
+		if (parsedJson.camera_position != null && parsedJson.camera_position.length > 1 && parsedJson.camera_position[1] != 0)
+			charNode.set("camy", Std.string(parsedJson.camera_position[1]));
+
+		//making scale a var because codename feature makes it so offsets work no matter the scale.
+		var daScale = (parsedJson.scale != null && parsedJson.scale != 1) ? parsedJson.scale : 1;
+		charNode.set("scale", Std.string(daScale));
+
+		if (parsedJson.flip_x != null && parsedJson.flip_x)
+			charNode.set("flipX", "true");
+
+		if (parsedJson.no_antialiasing != null && parsedJson.no_antialiasing)
+			charNode.set("antialiasing", "false");
+
+		if (parsedJson.sing_duration != null && parsedJson.sing_duration != 4)
+			charNode.set("holdTime", Std.string(parsedJson.sing_duration));
+
+		if (parsedJson.healthbar_colors != null && parsedJson.healthbar_colors.length > 2)
+			charNode.set("color", "#" + StringTools.hex(parsedJson.healthbar_colors[0], 2) + StringTools.hex(parsedJson.healthbar_colors[1], 2) + StringTools.hex(parsedJson.healthbar_colors[2], 2));
+
+		for (anim in parsedJson.animations) {
+			var animNode = Xml.createElement("anim");
+			charNode.addChild(animNode);
+			animNode.set("name", anim.anim); 
+			animNode.set("anim", anim.name);
+
+			if (anim.fps != null && anim.fps != 24)
+				animNode.set("fps", Std.string(anim.fps));
+
+			if (anim.offsets != null && anim.offsets.length > 0 && anim.offsets[0] != 0)
+				animNode.set("x", Std.string(anim.offsets[0] / daScale));
+			if (anim.offsets != null && anim.offsets.length > 1 && anim.offsets[1] != 0)
+				animNode.set("y", Std.string(anim.offsets[1] / daScale));
+
+			if (anim.loop != null && anim.loop)
+				animNode.set("loop", "true");
+
+			if (anim.indices != null && anim.indices.length > 0)
+				animNode.set("indices", anim.indices.join(","));
+		}
+
+		var cneDialog = new FileDialog();
+		cneDialog.onSelect.add(function(cneFile) {
+			File.saveContent(cneFile, Printer.print(xml, true));
+		});
+		cneDialog.browse(FileDialogType.SAVE, 'xml', null, 'Save Codename Character XML.');
+	});
+	dialog.browse(FileDialogType.OPEN, 'json', null, 'Open Psych Character JSON.');
+}
+
+function CHARACTER_cneToPsych(name) {
+	curFunc = "CHARACTER_cneToPsych";
+
+	var xmlPath = Paths.xml('characters/' + name);
+	if (!Assets.exists(xmlPath)) {
+		onPanic(curFunc + ': The XML file for "' + name + '" could not be found.');
+		return;
+	}
+	var xml = Xml.parse(Assets.getText(xmlPath)).firstElement();
+	if (xml == null) {
+		onPanic(curFunc + ': The "character" node for "' + name + '" could not be found.');
+		return;
+	}
+
+	function getAtt(att, defaultAtt) {
+		return (xml.exists(att)) ? xml.get(att) : defaultAtt;
+	}
+
+	var xmlColor = StringTools.replace(StringTools.replace(getAtt("color", "#FFFFFF"), "#", ""), "0x", "");
+	xmlColor = Std.parseInt("0x" + xmlColor);
+	var scale = Std.parseFloat(getAtt("scale", "1"));
+	var isPlayerMult = (getAtt("isPlayer", "false") == "true") ? -1 : 1;
+	var json = {
+		animations: [],
+		image: "characters/" + name,
+		scale: scale,
+		sing_duration: Std.parseFloat(getAtt("holdTime", "4")),
+		healthicon: name,
+
+		position: [Std.parseInt(getAtt("x", "0")), Std.parseFloat(getAtt("y", "0"))],
+		camera_position: [Std.parseInt(getAtt("camx", "0")), Std.parseFloat(getAtt("camy", "0"))],
+
+		flip_x: getAtt("flipX", "false") == "true",
+		no_antialiasing: getAtt("antialiasing", "true") == "false",
+		healthbar_colors: [
+			(xmlColor >> 16) & 0xFF,
+			(xmlColor >> 8) & 0xFF,
+			xmlColor & 0xFF
+		]
+	};
+
+	for (anim in xml.elementsNamed("anim")) {
+		function getAnimAtt(att, defaultAtt) {
+			return (anim.exists(att)) ? anim.get(att) : defaultAtt;
+		}
+
+		json.animations.push({
+			anim: getAnimAtt("name", "how do you not have an anim name"),
+			name: getAnimAtt("anim", "how do you not have an anim prefix"),
+			fps: Std.parseInt(getAnimAtt("fps", "24")),
+			offsets: [Std.parseInt(getAnimAtt("x", "0")) * scale * isPlayerMult, Std.parseFloat(getAnimAtt("y", "0")) * scale],
+			loop: getAnimAtt("loop", "false") == "true",
+			indices: (anim.exists("indices")) ? [for (indice in anim.get("indices").split(",")) Std.parseInt(StringTools.trim(indice))] : []
+		});
+	}
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		File.saveContent(file, Json.stringify(json, null, "\t"));
+	});
+	dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Psych Character JSON.');
+}
+
+function CHARACTER_yoshiToCne() {
+	curFunc = "CHARACTER_yoshiToCne";
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		var parsedJson = Json.parse(File.getContent(file));
+
+		var xml = Xml.createDocument();
+		xml.addChild(Xml.createDocType("codename-engine-character"));
+
+		var charNode = Xml.createElement("character");
+		xml.addChild(charNode);
+
+		if (parsedJson.globalOffset != null && parsedJson.globalOffset.x != 0)
+			charNode.set("x", Std.string(parsedJson.globalOffset.x));
+		if (parsedJson.globalOffset != null && parsedJson.globalOffset.y != 0)
+			charNode.set("y", Std.string(parsedJson.globalOffset.y));
+
+		if (parsedJson.camOffset != null && parsedJson.camOffset.x != 0)
+			charNode.set("camx", Std.string(parsedJson.camOffset.x));
+		if (parsedJson.camOffset != null && parsedJson.camOffset.y != 0)
+			charNode.set("camy", Std.string(parsedJson.camOffset.y));
+
+		//making scale a var because codename feature makes it so offsets work no matter the scale.
+		var daScale = (parsedJson.scale != null && parsedJson.scale != 1) ? parsedJson.scale : 1;
+		charNode.set("scale", Std.string(daScale));
+
+		if (parsedJson.flipX != null && parsedJson.flipX)
+			charNode.set("flipX", "true");
+
+		if (parsedJson.antialiasing != null && !parsedJson.antialiasing)
+			charNode.set("antialiasing", "false");
+
+		if (parsedJson.healthbarColor != null)
+			charNode.set("color", parsedJson.healthbarColor);
+
+		for (anim in parsedJson.anims) {
+			var animNode = Xml.createElement("anim");
+			charNode.addChild(animNode);
+			animNode.set("name", anim.name);
+			animNode.set("anim", anim.anim);
+
+			if (anim.framerate != null && anim.framerate != 24)
+				animNode.set("fps", Std.string(anim.framerate));
+
+			if (anim.x != null && anim.x != 0)
+				animNode.set("x", Std.string(anim.x / daScale));
+			if (anim.y != null && anim.y != 0)
+				animNode.set("y", Std.string(anim.y / daScale));
+
+			if (anim.loop != null && anim.loop)
+				animNode.set("loop", "true");
+
+			if (anim.indices != null && anim.indices.length > 0)
+				animNode.set("indices", anim.indices.join(","));
+		}
+
+		var cneDialog = new FileDialog();
+		cneDialog.onSelect.add(function(cneFile) {
+			File.saveContent(cneFile, Printer.print(xml, true));
+		});
+		cneDialog.browse(FileDialogType.SAVE, 'xml', null, 'Save Codename Character XML.');
+	});
+	dialog.browse(FileDialogType.OPEN, 'json', null, 'Open Yoshi Character JSON.');
+}
+
+function CHARACTER_cneToYoshi(name) {
+	curFunc = "CHARACTER_cneToYoshi";
+
+	var xmlPath = Paths.xml('characters/' + name);
+	if (!Assets.exists(xmlPath)) {
+		onPanic(curFunc + ': The XML file for "' + name + '" could not be found.');
+		return;
+	}
+	var xml = Xml.parse(Assets.getText(xmlPath)).firstElement();
+	if (xml == null) {
+		onPanic(curFunc + ': The "character" node for "' + name + '" could not be found.');
+		return;
+	}
+
+	function getAtt(att, defaultAtt) {
+		return (xml.exists(att)) ? xml.get(att) : defaultAtt;
+	}
+
+	var scale = Std.parseFloat(getAtt("scale", "1"));
+	var isPlayerMult = (getAtt("isPlayer", "false") == "true") ? -1 : 1;
+	var json = {
+		anims: [],
+		globalOffset: {x: Std.parseFloat(getAtt("x", "0")), y: Std.parseFloat(getAtt("y", "0"))},
+		camOffset: {x: Std.parseFloat(getAtt("camx", "0")), y: Std.parseFloat(getAtt("camy", "0"))},
+		antialiasing: getAtt("antialiasing", "true") != "false",
+		scale: scale,
+		danceSteps: ["idle"],
+		healthIconSteps: [[20, 0], [0, 1]],
+		flipX: getAtt("flipX", "false") == "true",
+		healthbarColor: getAtt("color", "#00FF70"),
+		arrowColors: null
+	};
+
+	for (anim in xml.elementsNamed("anim")) {
+		function getAnimAtt(att, defaultAtt) {
+			return (anim.exists(att)) ? anim.get(att) : defaultAtt;
+		}
+
+		json.anims.push({
+			name: getAnimAtt("name", "how do you not have an anim name"),
+			anim: getAnimAtt("anim", "how do you not have an anim prefix"),
+			framerate: Std.parseInt(getAnimAtt("fps", "24")),
+			x: Std.parseFloat(getAnimAtt("x", "0")) * scale * isPlayerMult,
+			y: Std.parseFloat(getAnimAtt("y", "0")) * scale,
+			loop: getAnimAtt("loop", "false") == "true",
+			indices: (anim.exists("indices")) ? [for (indice in anim.get("indices").split(",")) Std.parseInt(StringTools.trim(indice))] : []
+		});
+	}
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		File.saveContent(file, Json.stringify(json, null, "\t"));
+	});
+	dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Yoshi Character JSON.');
+}
