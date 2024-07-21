@@ -14,13 +14,15 @@ import funkin.editors.ui.UINumericStepper;
 
 var folderTextBox:UITextBox;
 var folderTxt:UIText;
+var camX:UINumericStepper;
+var camY:UINumericStepper;
 var zoomBox:UINumericStepper;
 
 function create() {
 	winTitle = 'Stage Properties';
 	
 	winWidth = 350;
-	winHeight = 200;
+	winHeight = 250;
 }
 
 function postCreate() {
@@ -40,6 +42,15 @@ function postCreate() {
 	zoomBox = new UINumericStepper(folderTextBox.x + folderTextBox.bWidth + 10, folderTextBox.y, zoom, 0.001, 2, null, null, 84);
 	add(zoomBox);
 	addLabelOn(zoomBox, "Zoom");
+
+	camX = new UINumericStepper(folderTextBox.x, folderTextBox.y + 70, xml.get("startCamPosX"), 0.001, 2, null, null, 110);
+	add(camX);
+	addLabelOn(camX, "Starting Camera (X,Y)");
+
+	add(new UIText(camX.x + 110 - 32, camX.y + 9, 0, ",", 22));
+
+	camY = new UINumericStepper(camX.x + 110 - 32 + 26, camX.y, xml.get("startCamPosY"), 0.001, 2, null, null, 110);
+	add(camY);
 
 	var saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save", function() {
 		saveProperties();		
@@ -61,7 +72,7 @@ function postCreate() {
 
 function saveProperties() {
 	var spritesParentFolder = folderTextBox.label.text;
-	if (spritesParentFolder.charAt(spritesParentFolder.length-1) != "/")
+	if (spritesParentFolder != "" && spritesParentFolder.charAt(spritesParentFolder.length-1) != "/")
 		spritesParentFolder = spritesParentFolder + "/";
 
 	var oldFolder = (xml.exists("folder")) ? xml.get("folder") : "";
@@ -101,6 +112,12 @@ function saveProperties() {
 	if (zoomBox.onChange != null)
 		zoomBox.onChange(zoomBox.label.text); // workaround the fact the value property only gets set on unfocus.
 	xml.set("zoom", zoomBox.value);
+	xml.remove("startCamPosX");
+	xml.remove("startCamPosY");
+	if (camX.value != 0)
+		xml.set("startCamPosX", camX.value);
+	if (camY.value != 0)
+		xml.set("startCamPosY", camY.value);
 
 	for (mem in stageGroup.members) {
 		if (Std.isOfType(mem, FunkinSprite))

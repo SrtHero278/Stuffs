@@ -1,0 +1,308 @@
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
+
+var charMap = FlxG.state.stateScripts.get("charMap");
+
+import Xml;
+import Reflect;
+var getProp = Reflect.getProperty;
+
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+import funkin.editors.ui.UICheckbox;
+import funkin.editors.ui.UIDropDown;
+import funkin.editors.ui.UINumericStepper;
+import funkin.backend.FunkinSprite;
+
+var newSprite:Bool = editingSprite == null;
+
+var nameTextBox:UITextBox;
+var camX:UINumericStepper;
+var camY:UINumericStepper;
+
+var posX:UINumericStepper;
+var posY:UINumericStepper;
+var scaleBox:UINumericStepper;
+var mirrorCheck:UICheckbox;
+
+var scrollX:UINumericStepper;
+var scrollY:UINumericStepper;
+
+var skewX:UINumericStepper;
+var skewY:UINumericStepper;
+var alphaBox:UINumericStepper;
+
+var saveButton:UIButton;
+var closeButton:UIButton;
+
+var nodeList = []; //This will get set soon.
+
+function create() {
+	winTitle = newSprite ? 'Creating Character Position' : 'Character Position Properties';
+	winWidth *= 0.8;
+	winHeight *= 0.85;
+}
+
+function postCreate() {
+	function addLabelOn(ui, text:String)
+		add(new UIText(ui.x, ui.y - 24, 0, text));
+
+	var title:UIText;
+	add(title = new UIText(windowSpr.x + 20, windowSpr.y + 30 + 16, 0, newSprite ? "Create Character Position" : "Edit Character Position", 28));
+
+	if (newSprite) {
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("char")
+		};
+	}
+
+	var canChangeName = true;
+	var defaultX = 0;
+	var defaultY = 0;
+	var charName = switch (editingSprite.node.nodeName) {
+		case "boyfriend", "bf", "player":
+			canChangeName = false;
+			defaultX = 770;
+			defaultY = 100;
+			"Player";
+		case "girlfriend", "gf":
+			canChangeName = false;
+			defaultX = 400;
+			defaultY = 130;
+			"Spectator";
+		case "dad", "opponent":
+			canChangeName = false;
+			defaultX = 100;
+			defaultY = 100;
+			"Opponent";
+		default: editingSprite.node.get("name");
+	};
+	nameTextBox = new UITextBox(title.x, title.y + title.height + 60, charName, 190);
+	nameTextBox.selectable = canChangeName;
+	add(nameTextBox);
+	addLabelOn(nameTextBox, "Position Name");
+
+	var mirror = (editingSprite.node.exists("flip") || editingSprite.node.exists("flipX")) ? (editingSprite.node.get("flip") == "true" || editingSprite.node.get("flipX") == "true") : charName == "Player";
+	mirrorCheck = new UICheckbox(nameTextBox.x + 190 + 26, nameTextBox.y, "Facing Left?", mirror);
+	add(mirrorCheck);
+	mirrorCheck.x += 8; mirrorCheck.y += 6;
+
+	posX = new UINumericStepper(nameTextBox.x, nameTextBox.y + 75, (editingSprite.node.exists("x")) ? editingSprite.node.get("x") : defaultX, 0.001, 2, null, null, 110);
+	add(posX);
+	addLabelOn(posX, "Position (X,Y)");
+
+	add(new UIText(posX.x + 110 - 32, posX.y + 9, 0, ",", 22));
+
+	posY = new UINumericStepper(posX.x + 110 - 32 + 26, posX.y, (editingSprite.node.exists("y")) ? editingSprite.node.get("y") : defaultY, 0.001, 2, null, null, 110);
+	add(posY);
+
+	camX = new UINumericStepper(mirrorCheck.x, posY.y, editingSprite.node.get("camxoffset"), 0.001, 2, null, null, 110);
+	add(camX);
+	addLabelOn(camX, "Camera Offset (X,Y)");
+
+	add(new UIText(camX.x + 110 - 32, camX.y + 9, 0, ",", 22));
+
+	camY = new UINumericStepper(camX.x + 110 - 32 + 26, camX.y, editingSprite.node.get("camyoffset"), 0.001, 2, null, null, 110);
+	add(camY);
+
+	var scroll = [editingSprite.node.get("scrollx"), editingSprite.node.get("scrolly")];
+	if (editingSprite.node.exists("scroll")) {
+		scroll = [editingSprite.node.get("scroll"), editingSprite.node.get("scroll")];
+		editingSprite.node.remove("scroll");
+	}
+	if (scroll[0] == null)
+		scroll[0] = 1 - 0.05 * (charName == "Spectator");
+	if (scroll[1] == null)
+		scroll[1] = 1 - 0.05 * (charName == "Spectator");
+	
+	scrollX = new UINumericStepper(posX.x, posX.y + 75, scroll[0], 0.001, 2, null, null, 110);
+	add(scrollX);
+	addLabelOn(scrollX, "Scroll (X,Y)");
+
+	add(new UIText(scrollX.x + 110 - 32, scrollX.y + 9, 0, ",", 22));
+
+	scrollY = new UINumericStepper(scrollX.x + 110 - 32 + 26, scrollX.y, scroll[1], 0.001, 2, null, null, 110);
+	add(scrollY);
+
+	skewX = new UINumericStepper(mirrorCheck.x, scrollY.y, editingSprite.node.get("skewx"), 0.001, 2, null, null, 110);
+	add(skewX);
+	addLabelOn(skewX, "Skew (X,Y)");
+
+	add(new UIText(skewX.x + 110 - 32 + 0, skewX.y + 9, 0, ",", 22));
+
+	skewY = new UINumericStepper(skewX.x + 110 - 32 + 26, skewX.y, editingSprite.node.get("skewy"), 0.001, 2, null, null, 110);
+	add(skewY);
+
+	var scale = editingSprite.node.exists("scale") ? editingSprite.node.get("scale") : 1;
+	scaleBox = new UINumericStepper(scrollX.x, scrollX.y + 75, scale, 0.001, 2, null, null, 110);
+	add(scaleBox);
+	addLabelOn(scaleBox, "Scale");
+
+	var alpha = editingSprite.node.exists("alpha") ? editingSprite.node.get("alpha") : 1;
+	alphaBox = new UINumericStepper(scaleBox.x + 110 - 32 + 26, scaleBox.y, alpha, 0.001, 2, null, null, 110);
+	add(alphaBox);
+	addLabelOn(alphaBox, "Alpha");
+
+	saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20 - 125, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save & Close", function() {
+		saveData();
+		close();
+	}, 125);
+	add(saveButton);
+
+	closeButton = new UIButton(saveButton.x - 20, saveButton.y, newSprite ? "Cancel" : "Close", function() {
+		close();
+	}, 125);
+	add(closeButton);
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+}
+
+function saveData() {
+	for (box in [posX, posY, camX, camY, scaleBox, scrollX, scrollY, skewX, skewY, alphaBox]) {
+		if (box.onChange != null)
+			box.onChange(box.label.text); // workaround the fact the value property only gets set on unfocus.
+	}
+	
+	var tweakedName = switch (nameTextBox.label.text.toLowerCase()) {
+		case "boyfriend", "bf", "player": "Player";
+		case "girlfriend", "gf", "spectator": "Spectator";
+		case "dad", "opponent": "Opponent";
+		default: nameTextBox.label.text;
+	};
+	setNodeList(tweakedName);
+
+	var oldName = editingSprite.node.get("name");
+	var curNode = editingSprite.node;
+
+	if (editingSprite.node.exists("flipX"))
+		editingSprite.node.remove("flipX");
+	for (thingy in nodeList) {
+		editingSprite.node.remove(thingy.name); // remove it to get rid of default values.
+		var value = getProp(thingy.inputObject, thingy.prop);
+		if (value != thingy.defaultVal)
+			editingSprite.node.set(thingy.name, value);
+	}
+
+	trace(editingSprite.node);
+
+	if (charMap.exists(tweakedName)) {
+		editingSprite = charMap[tweakedName];
+		editingSprite.node = curNode;
+	}
+	if (newSprite) {
+		editingSprite.sprite = new Character(0, 0, "bf", false);
+		editingSprite.sprite.shader = brightenShader;
+	}
+	
+	var defaultX = 0;
+	var defaultY = 0;
+	switch (tweakedName) {
+		case "Player":
+			defaultX = 770;
+			defaultY = 100;
+		case "Spectator":
+			defaultX = 400;
+			defaultY = 130;
+		case "Opponent":
+			defaultX = 100;
+			defaultY = 100;
+	};
+	FlxG.state.stateScripts.set("editingSprite", editingSprite);
+	FlxG.state.call("saveCharButton", [tweakedName, defaultX, defaultY, 1, 0xFFFF0396]);
+	stageGroup.insert(editingSprite.index, editingSprite.sprite);
+	charMap.set(tweakedName, editingSprite);
+	FlxG.state.call("updateCharView", []);
+}
+
+function setNodeList(name) {
+	nodeList = [
+		{
+			name: "camxoffset",
+			inputObject: camX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "camyoffset",
+			inputObject: camY,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "x",
+			inputObject: posX,
+			prop: "value",
+			defaultVal: switch (name) {
+				case "Player": 770;
+				case "Opponent": 100;
+				case "Spectator": 400;
+				default: 0;
+			}
+		},
+		{
+			name: "y",
+			inputObject: posY,
+			prop: "value",
+			defaultVal: switch (name) {
+				case "Player", "Opponent": 100;
+				case "Spectator": 130;
+				default: 0;
+			}
+		},
+		{
+			name: "scale",
+			inputObject: scaleBox,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "flip",
+			inputObject: mirrorCheck,
+			prop: "checked",
+			defaultVal: name == "Player"
+		},
+		{
+			name: "scrollx",
+			inputObject: scrollX,
+			prop: "value",
+			defaultVal: 1 - 0.05 * (name == "Spectator")
+		},
+		{
+			name: "scrolly",
+			inputObject: scrollY,
+			prop: "value",
+			defaultVal: 1 - 0.05 * (name == "Spectator")
+		},
+		{
+			name: "skewx",
+			inputObject: skewX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "skewy",
+			inputObject: skewY,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "alpha",
+			inputObject: alphaBox,
+			prop: "value",
+			defaultVal: 1
+		}
+	];
+	if (name != "Player" && name != "Spectator" && name != "Opponent") {
+		nodeList.push({
+			name: "name",
+			inputObject: nameTextBox.label,
+			prop: "text",
+			defaultVal: ""
+		});
+	}
+}

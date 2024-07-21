@@ -1,0 +1,289 @@
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
+
+var spriteMap = FlxG.state.stateScripts.get("spriteMap");
+
+import Xml;
+import Reflect;
+var getProp = Reflect.getProperty;
+
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+import funkin.editors.ui.UICheckbox;
+import funkin.editors.ui.UIDropDown;
+import funkin.editors.ui.UINumericStepper;
+import funkin.backend.FunkinSprite;
+
+var newSprite:Bool = editingSprite == null;
+
+var nameTextBox:UITextBox;
+var fileTextBox:UITextBox;
+
+var posX:UINumericStepper;
+var posY:UINumericStepper;
+var scaleBox:UINumericStepper;
+var hitboxCheck:UICheckbox;
+
+var scrollX:UINumericStepper;
+var scrollY:UINumericStepper;
+var zoomFactor:UINumericStepper;
+var aliasCheck:UICheckbox;
+
+var skewX:UINumericStepper;
+var skewY:UINumericStepper;
+var alphaBox:UINumericStepper;
+var animType:UIDropDown;
+
+var saveButton:UIButton;
+var closeButton:UIButton;
+
+var nodeList = []; //This will get set soon.
+
+var callPost:Bool = true;
+
+function create() {
+	winTitle = newSprite ? 'Creating Sprite' : 'Sprite ' + editingSprite.node.get("name") + ' properties';
+}
+
+function postCreate() {
+	function addLabelOn(ui, text:String)
+		add(new UIText(ui.x, ui.y - 24, 0, text));
+
+	var title:UIText;
+	add(title = new UIText(windowSpr.x + 20, windowSpr.y + 30 + 16, 0, newSprite ? "Create New Sprite" : "Edit Sprite Properties", 28));
+
+	if (newSprite) {
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("sprite")
+		};
+	}
+
+	nameTextBox = new UITextBox(title.x, title.y + title.height + 60, editingSprite.node.get("name"), 190);
+	add(nameTextBox);
+	addLabelOn(nameTextBox, "Sprite Name");
+
+	fileTextBox = new UITextBox(nameTextBox.x + 200, nameTextBox.y, editingSprite.node.get("sprite"), 320);
+	add(fileTextBox);
+	addLabelOn(fileTextBox, "Image Path");
+
+	posX = new UINumericStepper(nameTextBox.x, nameTextBox.y + 75, editingSprite.node.get("x"), 0.001, 2, null, null, 110);
+	add(posX);
+	addLabelOn(posX, "Position (X,Y)");
+
+	add(new UIText(posX.x + 110 - 32, posX.y + 9, 0, ",", 22));
+
+	posY = new UINumericStepper(posX.x + 110 - 32 + 26, posX.y, editingSprite.node.get("y"), 0.001, 2, null, null, 110);
+	add(posY);
+
+	var scale = editingSprite.node.exists("scale") ? editingSprite.node.get("scale") : 1;
+	scaleBox = new UINumericStepper(fileTextBox.x, posX.y, scale, 0.001, 2, null, null, 110);
+	add(scaleBox);
+	addLabelOn(scaleBox, "Scale");
+
+	hitboxCheck = new UICheckbox(scaleBox.x + 108 - 32 + 26, scaleBox.y, "Scale from Top-Left?", editingSprite.node.get("updateHitbox") == "true");
+	add(hitboxCheck);
+	hitboxCheck.x += 8; hitboxCheck.y += 6;
+
+	var scroll = [editingSprite.node.get("scrollx"), editingSprite.node.get("scrolly")];
+	if (editingSprite.node.exists("scroll")) {
+		scroll = [editingSprite.node.get("scroll"), editingSprite.node.get("scroll")];
+		editingSprite.node.remove("scroll");
+	}
+	if (scroll[0] == null)
+		scroll[0] = 1;
+	if (scroll[1] == null)
+		scroll[1] = 1;
+	
+	scrollX = new UINumericStepper(posX.x, posX.y + 100, scroll[0], 0.001, 2, null, null, 110);
+	add(scrollX);
+	addLabelOn(scrollX, "Scroll (X,Y)");
+
+	add(new UIText(scrollX.x + 110 - 32, scrollX.y + 9, 0, ",", 22));
+
+	scrollY = new UINumericStepper(scrollX.x + 110 - 32 + 26, scrollX.y, scroll[1], 0.001, 2, null, null, 110);
+	add(scrollY);
+
+	var zoom = editingSprite.node.exists("zoomfactor") ? editingSprite.node.get("zoomfactor") : 1;
+	zoomFactor = new UINumericStepper(fileTextBox.x, scrollY.y, zoom, 0.001, 2, null, null, 110);
+	add(zoomFactor);
+	addLabelOn(zoomFactor, "Zoom Factor");
+
+	aliasCheck = new UICheckbox(zoomFactor.x + 108 - 32 + 26, zoomFactor.y, "Antialiased?", editingSprite.node.get("antialiasing") != "false");
+	add(aliasCheck);
+	aliasCheck.x += 8; aliasCheck.y += 6;
+
+	skewX = new UINumericStepper(scrollX.x, scrollX.y + 75, editingSprite.node.get("skewx"), 0.001, 2, null, null, 110);
+	add(skewX);
+	addLabelOn(skewX, "Skew (X,Y)");
+
+	add(new UIText(skewX.x + 110 - 32 + 0, skewX.y + 9, 0, ",", 22));
+
+	skewY = new UINumericStepper(skewX.x + 110 - 32 + 26, skewX.y, editingSprite.node.get("skewy"), 0.001, 2, null, null, 110);
+	add(skewY);
+
+	var alpha = editingSprite.node.exists("alpha") ? editingSprite.node.get("alpha") : 1;
+	alphaBox = new UINumericStepper(fileTextBox.x, skewX.y, alpha, 0.001, 2, null, null, 110);
+	add(alphaBox);
+	addLabelOn(alphaBox, "Alpha");
+
+	var index = Math.max(["beat", "loop", "none"].indexOf(editingSprite.node.get("type")), 0);
+	animType = new UIDropDown(alphaBox.x + 108 - 32 + 26, alphaBox.y, 200, 32, ["On Beat", "Looping", "None"], index);
+	add(animType);
+	addLabelOn(animType, "Animation Type");
+
+	saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20 - 125, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save & Close", function() {
+		saveData();
+		close();
+	}, 125);
+	add(saveButton);
+
+	closeButton = new UIButton(saveButton.x - 20, saveButton.y, newSprite ? "Cancel" : "Close", function() {
+		close();
+	}, 125);
+	add(closeButton);
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+
+	setNodeList();
+}
+
+function saveData() {
+	for (box in [posX, posY, scaleBox, scrollX, scrollY, zoomFactor, skewX, skewY, alphaBox]) {
+		if (box.onChange != null)
+			box.onChange(box.label.text); // workaround the fact the value property only gets set on unfocus.
+	}
+
+	var oldName = editingSprite.node.get("name");
+	var curNode = editingSprite.node;
+
+	for (thingy in nodeList) {
+		editingSprite.node.remove(thingy.name); // remove it to get rid of default values.
+		var value = getProp(thingy.inputObject, thingy.prop);
+		if (value != thingy.defaultVal)
+			editingSprite.node.set(thingy.name, value);
+	}
+	if (animType.index > 0)
+		editingSprite.node.set("type", ["beat", "loop", "none"][animType.index]);
+
+	trace(editingSprite.node);
+
+	if (newSprite && spriteMap.exists(editingSprite.node.get("name"))) {
+		editingSprite = spriteMap[editingSprite.node.get("name")];
+		editingSprite.node = curNode;
+	} else if (!newSprite) {
+		spriteMap.remove(oldName);
+	}
+
+	if (editingSprite.sprite != null) {
+		stageGroup.remove(editingSprite.sprite, true);
+		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
+	}
+
+	FlxG.state.stateScripts.set("editingSprite", editingSprite);
+	FlxG.state.call("saveSprButton");
+	spriteMap.set(editingSprite.node.get("name"), editingSprite);
+
+	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+	FlxG.state.call("checkEmptyFrame");
+	editingSprite.sprite.shader = brightenShader;
+	stageGroup.insert(editingSprite.index, editingSprite.sprite);
+
+	if (editingSprite.sprite != null) {
+		for(prop in editingSprite.node.elementsNamed("property"))
+			XMLUtil.applyXMLProperty(editingSprite.sprite, prop);
+	}
+}
+
+function setNodeList() {
+	nodeList = [
+		{
+			name: "name",
+			inputObject: nameTextBox.label,
+			prop: "text",
+			defaultVal: ""
+		},
+		{
+			name: "sprite",
+			inputObject: fileTextBox.label,
+			prop: "text",
+			defaultVal: ""
+		},
+		{
+			name: "x",
+			inputObject: posX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "y",
+			inputObject: posY,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "scale",
+			inputObject: scaleBox,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "updateHitbox",
+			inputObject: hitboxCheck,
+			prop: "checked",
+			defaultVal: false
+		},
+		{
+			name: "scrollx",
+			inputObject: scrollX,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "scrolly",
+			inputObject: scrollY,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "zoomfactor",
+			inputObject: zoomFactor,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "antialiasing",
+			inputObject: aliasCheck,
+			prop: "checked",
+			defaultVal: true
+		},
+		{
+			name: "skewx",
+			inputObject: skewX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "skewy",
+			inputObject: skewY,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "alpha",
+			inputObject: alphaBox,
+			prop: "value",
+			defaultVal: 1
+		},
+		{
+			name: "type",
+			inputObject: animType,
+			prop: "index",
+			defaultVal: 0
+		}
+	];
+}

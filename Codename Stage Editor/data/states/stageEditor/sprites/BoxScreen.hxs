@@ -1,0 +1,187 @@
+// basically SpriteScreen.hxs but modified for boxes.
+
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+var stageGroup = FlxG.state.stateScripts.get("stageGroup");
+var xml = FlxG.state.stateScripts.get("xml");
+
+var spriteMap = FlxG.state.stateScripts.get("spriteMap");
+
+import Xml;
+import Reflect;
+var getProp = Reflect.getProperty;
+
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UITextBox;
+import funkin.editors.ui.UIColorwheel;
+import funkin.editors.ui.UINumericStepper;
+import funkin.backend.FunkinSprite;
+
+var newSprite:Bool = editingSprite == null;
+
+var nameTextBox:UITextBox;
+var color:UIColorwheel;
+
+var posX:UINumericStepper;
+var posY:UINumericStepper;
+var sizeX:UINumericStepper;
+var sizeY:UINumericStepper;
+
+var saveButton:UIButton;
+var closeButton:UIButton;
+
+var nodeList = []; //This will get set soon.
+
+function create() {
+	winTitle = newSprite ? 'Creating Box' : 'Box ' + editingSprite.node.get("name") + ' properties';
+	winHeight *= 0.65;
+}
+
+function postCreate() {
+	function addLabelOn(ui, text:String)
+		add(new UIText(ui.x, ui.y - 24, 0, text));
+
+	var title:UIText;
+	add(title = new UIText(windowSpr.x + 20, windowSpr.y + 30 + 16, 0, newSprite ? "Create New Box" : "Edit Box Properties", 28));
+
+	if (newSprite) {
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("solid")
+		};
+	}
+
+	nameTextBox = new UITextBox(title.x, title.y + title.height + 60, editingSprite.node.get("name"), 190);
+	add(nameTextBox);
+	addLabelOn(nameTextBox, "Sprite Name");
+
+	var xmlColor = editingSprite.node.exists("color") ? CoolUtil.getColorFromDynamic(editingSprite.node.get("color")) : -1;
+	color = new UIColorwheel(nameTextBox.x + 220, nameTextBox.y, xmlColor);
+	add(color);
+	addLabelOn(color, "Sprite Color");
+
+	posX = new UINumericStepper(nameTextBox.x, nameTextBox.y + 75, editingSprite.node.get("x"), 0.001, 2, null, null, 110);
+	add(posX);
+	addLabelOn(posX, "Position (X,Y)");
+
+	add(new UIText(posX.x + 110 - 32, posX.y + 9, 0, ",", 22));
+
+	posY = new UINumericStepper(posX.x + 110 - 32 + 26, posX.y, editingSprite.node.get("y"), 0.001, 2, null, null, 110);
+	add(posY);
+	
+	sizeX = new UINumericStepper(posX.x, posX.y + 75, editingSprite.node.get("width"), 0.001, 2, null, null, 110);
+	add(sizeX);
+	addLabelOn(sizeX, "Size (X,Y)");
+
+	add(new UIText(sizeX.x + 110 - 32, sizeX.y + 9, 0, ",", 22));
+
+	sizeY = new UINumericStepper(sizeX.x + 110 - 32 + 26, sizeX.y, editingSprite.node.get("height"), 0.001, 2, null, null, 110);
+	add(sizeY);
+
+	saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20 - 125, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save & Close", function() {
+		saveData();
+		close();
+	}, 125);
+	add(saveButton);
+
+	closeButton = new UIButton(saveButton.x - 20, saveButton.y, newSprite ? "Cancel" : "Close", function() {
+		close();
+	}, 125);
+	add(closeButton);
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+
+	setNodeList();
+}
+
+function saveData() {
+	for (box in [posX, posY, sizeX, sizeY]) {
+		if (box.onChange != null)
+			box.onChange(box.label.text); // workaround the fact the value property only gets set on unfocus.
+	}
+
+	var oldName = editingSprite.node.get("name");
+	var curNode = editingSprite.node;
+
+	for (thingy in nodeList) {
+		editingSprite.node.remove(thingy.name); // remove it to get rid of default values.
+		var value = getProp(thingy.inputObject, thingy.prop);
+		if (value != thingy.defaultVal)
+			editingSprite.node.set(thingy.name, value);
+	}
+
+	trace(editingSprite.node);
+
+	if (newSprite && spriteMap.exists(editingSprite.node.get("name"))) {
+		editingSprite = spriteMap[editingSprite.node.get("name")];
+		editingSprite.node = curNode;
+	} else if (!newSprite) {
+		spriteMap.remove(oldName);
+	}
+
+	if (editingSprite.sprite != null) {
+		stageGroup.remove(editingSprite.sprite, true);
+		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
+	}
+
+	FlxG.state.stateScripts.set("editingSprite", editingSprite);
+	FlxG.state.call("saveSprButton");
+	spriteMap.set(editingSprite.node.get("name"), editingSprite);
+
+	function getAtt(name, defaultVal) {
+		return Std.parseFloat(editingSprite.node.exists(name) ? editingSprite.node.get(name) : defaultVal);
+	}
+
+	var xmlColor = editingSprite.node.exists("color") ? CoolUtil.getColorFromDynamic(editingSprite.node.get("color")) : -1;
+	editingSprite.sprite = new FlxSprite(getAtt("x", "0"), getAtt("y", "0")).makeSolid(getAtt("width", "0"), getAtt("height", "0"), xmlColor);
+	editingSprite.sprite.shader = brightenShader;
+	stageGroup.insert(editingSprite.index, editingSprite.sprite);
+
+	if (editingSprite.sprite != null) {
+		for(prop in editingSprite.node.elementsNamed("property"))
+			XMLUtil.applyXMLProperty(editingSprite.sprite, prop);
+	}
+}
+
+function setNodeList() {
+	nodeList = [
+		{
+			name: "name",
+			inputObject: nameTextBox.label,
+			prop: "text",
+			defaultVal: ""
+		},
+		{
+			name: "color",
+			inputObject: color,
+			prop: "curColorString",
+			defaultVal: "#FFFFFF"
+		},
+		{
+			name: "x",
+			inputObject: posX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "y",
+			inputObject: posY,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "width",
+			inputObject: sizeX,
+			prop: "value",
+			defaultVal: 0
+		},
+		{
+			name: "height",
+			inputObject: sizeY,
+			prop: "value",
+			defaultVal: 0
+		}
+	];
+}

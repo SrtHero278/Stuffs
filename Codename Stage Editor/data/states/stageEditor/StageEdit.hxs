@@ -19,6 +19,7 @@ import flixel.FlxCamera;
 
 import funkin.backend.assets.ModsFolder;
 import funkin.editors.EditorTreeMenu;
+import funkin.editors.ui.UIText;
 import funkin.editors.ui.UIState;
 import funkin.editors.ui.UITopMenu;
 import funkin.editors.ui.UIButton;
@@ -46,10 +47,48 @@ var uiCamera = new FlxCamera();
 uiCamera.bgColor = 0;
 
 var sprList:UIButtonList;
+var addBoxSpr:UIButton;
+var addBoxIco:FlxSprite;
+var addCharSpr:UIButton;
+var addCharIco:FlxSprite;
 var spriteMap:StringMap = new StringMap();
 var charMap:StringMap = new StringMap();
+var charViewList = [];
 
 var topMenu;
+
+function updateCharView() {
+	charViewList.splice(0, charViewList.length);
+	charViewList.push({
+		label: "View from Start",
+		onSelect: function(_) {
+			var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+			FlxTween.tween(FlxG.camera.scroll, {
+				x: xml.exists("startCamPosX") ? xml.get("startCamPosX") : 0,
+				y: xml.exists("startCamPosY") ? xml.get("startCamPosY") : 0
+			}, 0.5, {ease: FlxEase.quadOut});
+			FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
+		}
+	});
+	for (char in charMap.keys()) {
+		if (char == "Combo Group") continue;
+
+		charViewList.push({
+			label: "View from " + char,
+			onSelect: function(_) {
+				var spr = charMap[char].sprite;
+				var pos = spr.getCameraPosition();
+				var xMult = 1 - 2 * spr.isPlayer;
+				pos.x += Std.parseFloat(charMap[char].node.exists("camxoffset") ? charMap[char].node.get("camxoffset") : "0") * xMult;
+				pos.y += Std.parseFloat(charMap[char].node.exists("camyoffset") ? charMap[char].node.get("camyoffset") : "0");
+				var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
+				FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
+				FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
+				pos.put();
+			}
+		});
+	}
+}
 
 function create() {
 	FlxG.mouse.visible = true;
@@ -128,45 +167,28 @@ function create() {
 					label: "New Sprite",
 					onSelect: function(_) {
 						editingSprite = null;
-						openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+						openSubState(new UISubstateWindow(true, "stageEditor/sprites/SpriteScreen"));
+					}
+				},
+				{
+					label: "New Box",
+					onSelect: function(_) {
+						editingSprite = null;
+						openSubState(new UISubstateWindow(true, "stageEditor/sprites/BoxScreen"));
+					}
+				},
+				{
+					label: "New Character Pos",
+					onSelect: function(_) {
+						editingSprite = null;
+						openSubState(new UISubstateWindow(true, "stageEditor/sprites/CharPosScreen"));
 					}
 				}
 			]
 		},
 		{
 			label: "View",
-			childs: [
-				{
-					label: "View from Player",
-					onSelect: function(_) {
-						var pos = charMap["Player"].sprite.getCameraPosition();
-						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
-						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
-						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
-						pos.put();
-					}
-				},
-				{
-					label: "View from Spectator",
-					onSelect: function(_) {
-						var pos = charMap["Spectator"].sprite.getCameraPosition();
-						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
-						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
-						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
-						pos.put();
-					}
-				},
-				{
-					label: "View from Opponent",
-					onSelect: function(_) {
-						var pos = charMap["Opponent"].sprite.getCameraPosition();
-						var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
-						FlxTween.tween(FlxG.camera.scroll, {x: pos.x - FlxG.width * 0.5, y: pos.y - FlxG.height * 0.5}, 0.5, {ease: FlxEase.quadOut});
-						FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
-						pos.put();
-					}
-				}
-			]
+			childs: charViewList
 		}
 	];
 
@@ -175,34 +197,91 @@ function create() {
 	sprList = new UIButtonList(FlxG.width - 265, 30, 250, FlxG.height - 45, "Sprite List", FlxPoint.get(250, 54), null, 0);
 	sprList.cameras = [uiCamera];
 	sprList.frames = Paths.getFrames('editors/ui/inputbox');
+	sprList.addButton.field.text = "Sprite";
+	sprList.addButton.field.size = 13;
+	sprList.addButton.field.alignment = "left";
+	sprList.addButton.resize(sprList.addButton.bWidth / 3, sprList.addButton.bHeight);
 	sprList.addButton.callback = function() {
 		editingSprite = null;
-		openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+		openSubState(new UISubstateWindow(true, "stageEditor/sprites/SpriteScreen"));
 	}
 	add(sprList);
+
+	addBoxSpr = new UIButton(sprList.addButton.bWidth, 16, "Box", function() {
+		editingSprite = null;
+		openSubState(new UISubstateWindow(true, "stageEditor/sprites/BoxScreen"));
+	}, sprList.addButton.bWidth);
+	addBoxSpr.autoAlpha = false;
+	addBoxSpr.color = 0xFF00FF00;
+	addBoxSpr.cameras = [sprList.buttonCameras];
+	addBoxSpr.field.size = 13;
+	addBoxSpr.field.alignment = "left";
+	sprList.members.push(addBoxSpr);
+
+	addBoxIco = sprList.addIcon.clone();
+	addBoxSpr.members.push(addBoxIco);
+
+	addCharSpr = new UIButton(addBoxSpr.x + addBoxSpr.bWidth, 16, "Char", function() {
+		editingSprite = null;
+		openSubState(new UISubstateWindow(true, "stageEditor/sprites/CharPosScreen"));
+	}, addBoxSpr.bWidth);
+	addCharSpr.autoAlpha = false;
+	addCharSpr.color = 0xFF00FF00;
+	addCharSpr.cameras = [sprList.buttonCameras];
+	addCharSpr.field.size = 13;
+	addCharSpr.field.alignment = "left";
+	sprList.members.push(addCharSpr);
+
+	addCharIco = sprList.addIcon.clone();
+	addCharSpr.members.push(addCharIco);
 
 	loadStage();
 
 	if (charMap["Spectator"] == null) {
-		var spc = new Character(400, 130, "gf", false);
-		spc.shader = brightenShader;
-		makeCharButton("Spectator", Xml.createElement("gf"), 0xFFA5004D, spc);
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("gf"),
+			sprite: new Character(0, 0, "gf", false)
+		}
+		
+		saveCharButton("Spectator", 400, 130, 0.95, 0xFFA5004D);
+		charMap.set("Spectator", editingSprite);
+
+		editingSprite.sprite.shader = brightenShader;
+		stageGroup.insert(editingSprite.index, editingSprite.sprite);
 	}
 
 	if (charMap["Opponent"] == null) {
-		var cpu = new Character(100, 100, "dad", false);
-		cpu.shader = brightenShader;
-		makeCharButton("Opponent", Xml.createElement("dad"), 0xFFAF66CE, cpu);
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("dad"),
+			sprite: new Character(0, 0, "dad", false)
+		}
+		
+		saveCharButton("Opponent", 100, 100, 1, 0xFFAF66CE);
+		charMap.set("Opponent", editingSprite);
+
+		editingSprite.sprite.shader = brightenShader;
+		stageGroup.insert(editingSprite.index, editingSprite.sprite);
 	}
 
 	if (charMap["Player"] == null) {
-		var plr = new Character(770, 100, "bf", true);
-		plr.shader = brightenShader;
-		makeCharButton("Player", Xml.createElement("bf"), 0xFF31B0D1, plr);
+		editingSprite = {
+			index: -1,
+			node: Xml.createElement("bf"),
+			sprite: new Character(0, 0, "bf", false)
+		}
+		
+		saveCharButton("Player", 770, 100, 1, 0xFF31B0D1);
+		charMap.set("Player", editingSprite);
+
+		editingSprite.sprite.shader = brightenShader;
+		stageGroup.insert(editingSprite.index, editingSprite.sprite);
 	}
 
 	if (charMap["Combo Group"] == null)
 		makeComboGroup(Xml.createElement("combo"));
+	updateCharView();
 
 	var topSpr = new UITopMenu(topMenu);
 	topSpr.cameras = [uiCamera];
@@ -234,7 +313,7 @@ function dropFile(file) {
 
 	var sprName = Path.withoutDirectory(Path.withoutExtension(file));
 
-	if (subState != null && subState.scriptName == "stageEditor/SpriteScreen") {
+	if (subState != null && subState.scriptName == "stageEditor/sprites/SpriteScreen") {
 		if (subState.stateScripst.get("newSprite"))
 			subState.stateScripts.get("nameTextBox").label.text = sprName;
 		subState.stateScripts.get("fileTextBox").label.text = sprName;
@@ -271,6 +350,8 @@ function destroy() {
 var uiPos = FlxPoint.get();
 var movingSpr;
 var lastMoving;
+var oldPos = [0, 0];
+var mousePos = [0, 0];
 
 function overlappingPoint() {
 	var point = FlxG.mouse.getScreenPosition();
@@ -304,6 +385,7 @@ function update(e) {
 	FlxG.camera.scroll.x += e * 250 * (1 * FlxG.keys.pressed.L - 1 * FlxG.keys.pressed.J) * posMult;
 	FlxG.camera.scroll.y += e * 250 * (1 * FlxG.keys.pressed.K - 1 * FlxG.keys.pressed.I) * posMult;
 	FlxG.camera.zoom += e * (1 * FlxG.keys.pressed.E - 1 * FlxG.keys.pressed.Q);
+	FlxG.camera.zoom = Math.max(FlxG.camera.zoom, 0.01);
 
 	lastMoving = sprList.curMoving;
 
@@ -314,19 +396,18 @@ function update(e) {
 	if (uiPos.x <= 1010 && editingSprite != null) {
 		canClick = overlappingPoint();
 		currentCursor = (canClick) ? "hand" : "arrow";
-		movingSpr = movingSpr || (canClick && FlxG.mouse.justPressed);
+		if (canClick && FlxG.mouse.justPressed) {
+			movingSpr = true;
+			oldPos = [editingSprite.sprite.x, editingSprite.sprite.y];
+			mousePos = [FlxG.mouse.screenX, FlxG.mouse.screenY];
+		}
 	}
 	movingSpr = (movingSpr && !FlxG.mouse.justReleased);
 
-	//if (uiPos.x <= 1010 && editingSprite != null && FlxG.mouse.pressed && overlappingPoint()) {
 	if (movingSpr) {
-		var isChar = Std.isOfType(editingSprite.sprite, Character);
-		var isCombo = (editingSprite == charMap["Combo Group"]);
-		var offsetX = editingSprite.sprite.offset.x * isChar + 60 * isCombo;
-		var offsetY = editingSprite.sprite.offset.y * isChar + 60 * isCombo;
 		editingSprite.sprite.setPosition(
-			FlxG.mouse.screenX + (FlxG.camera.scroll.x * editingSprite.sprite.scrollFactor.x) + offsetX - editingSprite.sprite.width * 0.5,
-			FlxG.mouse.screenY + (FlxG.camera.scroll.y * editingSprite.sprite.scrollFactor.y) + offsetY - editingSprite.sprite.height * 0.5
+			oldPos[0] + (FlxG.mouse.screenX - mousePos[0]),
+			oldPos[1] + (FlxG.mouse.screenY - mousePos[1])
 		);
 		editingSprite.node.set("x", editingSprite.sprite.x);
 		editingSprite.node.set("y", editingSprite.sprite.y);
@@ -347,12 +428,22 @@ function postUpdate(e) {
 			stageGroup.add(spr.sprite);
 		}
 	}
+	sprList.addIcon.x = sprList.addButton.x + 10;
+	sprList.addButton.field.x = sprList.addButton.x + 25;
+	addBoxSpr.y = sprList.addButton.y;
+	addBoxIco.x = addBoxSpr.x + 10;
+	addBoxIco.y = sprList.addIcon.y;
+	addBoxSpr.field.x = addBoxSpr.x + 45;
+	addCharSpr.y = sprList.addButton.y;
+	addCharIco.x = addCharSpr.x + 10;
+	addCharIco.y = sprList.addIcon.y;
+	addCharSpr.field.x = addCharSpr.x + 40;
 
 	for (item in spriteMap.iterator()) {
 		var theA = item.button.colorTransform;
 		theA.redOffset = theA.greenOffset = theA.blueOffset = 50 * (editingSprite == item);
 
-		item.button.field.x += 10;
+		item.button.field.x = 10;
 		item.deleteButton.y = item.button.y + item.button.bHeight * 0.5 - item.deleteButton.bHeight * 0.5;
 		item.deleteIcon.y = item.deleteButton.y + 8;
 		item.childButton.y = item.deleteButton.y;
@@ -365,11 +456,15 @@ function postUpdate(e) {
 		var theA = item.button.colorTransform;
 		theA.redOffset = theA.greenOffset = theA.blueOffset = 50 * (editingSprite == item);
 
-		item.button.field.x += 10;
+		item.button.field.x = 10;
 		item.switchButton.y = item.button.y + item.button.bHeight * 0.5 - item.switchButton.bHeight * 0.5;
 		item.switchIcon.y = item.switchButton.y + 8;
 		item.editButton.y = item.switchButton.y;
 		item.editIcon.y = item.editButton.y + 8;
+		if (item.deleteButton != null) {
+			item.deleteButton.y = item.editButton.y;
+			item.deleteIcon.y = item.deleteButton.y + 8;
+		}
 	}
 }
 
@@ -403,7 +498,7 @@ function saveSprButton() {
 
 		var deleteButton = new UIButton(daButton.x + daButton.bWidth - 36, daButton.bHeight/2 - 16, "", function () {
 			var sprName = daButton.field.text;
-			editingSprite = (spriteMap[sprName].index == editingSprite.index) ? null : editingSprite;
+			editingSprite = (editingSprite != null && spriteMap[sprName].index == editingSprite.index) ? null : editingSprite;
 
 			var spr = spriteMap[sprName].sprite;
 			sprList.remove(daButton);
@@ -432,7 +527,7 @@ function saveSprButton() {
 
 		var childNodeButton = new UIButton(deleteButton.x - 36, deleteButton.y, "", function () {
 			editingSprite = spriteMap[daButton.field.text];
-			openSubState(new UISubstateWindow(true, "stageEditor/PropertyScreen"));
+			openSubState(new UISubstateWindow(true, "stageEditor/sprites/PropertyScreen"));
 		}, 32);
 		childNodeButton.autoAlpha = false;
 		daButton.members.push(childNodeButton);
@@ -443,7 +538,7 @@ function saveSprButton() {
 
 		var editButton = new UIButton(childNodeButton.x - 36, deleteButton.y, "", function () {
 			editingSprite = spriteMap[daButton.field.text];
-			openSubState(new UISubstateWindow(true, "stageEditor/SpriteScreen"));
+			openSubState(new UISubstateWindow(true, (editingSprite.node.nodeName == "box" || editingSprite.node.nodeName == "solid") ? "stageEditor/sprites/BoxScreen" : "stageEditor/sprites/SpriteScreen"));
 		}, 32);
 		editButton.color = 0xFFFFFF00;
 		editButton.autoAlpha = false;
@@ -468,67 +563,151 @@ function saveSprButton() {
 	}
 }
 
-function makeCharButton(name:String, node, color, character) {
-	var daButton = new UIButton(0, 0, name, function() {
-		brightenShader.data.offset.value[0] = 0.3;
-		editingSprite = charMap[name];
+function checkEmptyFrame() {
+	if (editingSprite.node.nodeName == "box" || editingSprite.node.nodeName == "solid") return;
+	if (editingSprite.sprite._frame != null && editingSprite.sprite.graphic.assetsKey != "flixel/images/logo/default.png") return;
 
-		var selectedIndex = editingSprite.index;
-		for (button in sprList.buttons.members) {
-			var sprName = button.field.text;
-			var spr = (button.color == 0xFFFFFF) ? spriteMap[sprName] : charMap[sprName];
+	var message = 'Sprite "' + editingSprite.node.get("name") + '" was unable to properly load the graphic.\n'
+				+ 'Stage Folder: "' + xml.get("folder") + '"\n'
+				+ 'Sprite Image: "' + (editingSprite.node.exists("sprite") ? editingSprite.node.get("sprite") : "CANNOT FIND `sprite` ATTRIBUTE.") + '"\n'
+				+ 'Attempted Path: "images/' + xml.get("folder") + editingSprite.node.get("sprite") + '.png"';
+	var warningText = new UIText(10, 710, 0, message, 18, 0xFFFF2E54);
+	warningText.y -= warningText.height;
+	warningText.cameras = [uiCamera];
+	add(warningText);
 
-			if (spr == charMap["Combo Group"]) {
-				for (thing in spr.sprite.members)
-					thing.shaderEnabled = (spr.index == selectedIndex);
-			} else {
-				spr.sprite.shaderEnabled = (spr.index == selectedIndex);
-				if (spr.sprite.animateAtlas != null)
-					spr.sprite.animateAtlas.shaderEnabled = (spr.index == selectedIndex);
+	FlxTween.tween(warningText, {y: warningText.y - 100, alpha: 0}, 2, {startDelay: 7, ease: FlxEase.quantIn});
+	CoolUtil.playMenuSFX(0, 0.4);
+}
+
+function saveCharButton(name, defaultX, defaultY, defaultScroll, color) {
+	function getAtt(name, defaultVal) {
+		return Std.parseFloat(editingSprite.node.exists(name) ? editingSprite.node.get(name) : defaultVal);
+	}
+
+	var scroll = [editingSprite.node.get("scrollx"), editingSprite.node.get("scrolly")];
+	if (editingSprite.node.exists("scroll")) {
+		editingSprite.node.set("scrollx", editingSprite.node.get("scroll"));
+		editingSprite.node.set("scrolly", editingSprite.node.get("scroll"));
+		scroll = [editingSprite.node.get("scroll"), editingSprite.node.get("scroll")];
+		editingSprite.node.remove("scroll");
+	}
+	if (scroll[0] == null) scroll[0] = defaultScroll;
+	if (scroll[1] == null) scroll[1] = defaultScroll;
+
+	editingSprite.sprite.setPosition(getAtt("x", defaultX), getAtt("y", defaultY));
+	editingSprite.sprite.scrollFactor.set(scroll[0], scroll[1]);
+	editingSprite.sprite.skew.set(getAtt("skewx", "0"), getAtt("skewy", "0"));
+	if (editingSprite.sprite.xml.exists("scale"))
+		editingSprite.sprite.scale.set(editingSprite.sprite.xml.get("scale"), editingSprite.sprite.xml.get("scale"));
+	else
+		editingSprite.sprite.scale.set(1, 1);
+	editingSprite.sprite.updateHitbox();
+	editingSprite.sprite.scale.x *= getAtt("scale", "1");
+	editingSprite.sprite.scale.y *= getAtt("scale", "1");
+	editingSprite.sprite.alpha = getAtt("alpha", "1");
+	var flipPos = (editingSprite.node.exists("flip") || editingSprite.node.exists("flipX")) ? (editingSprite.node.get("flip") == "true" || editingSprite.node.get("flipX") == "true") : name == "Player";
+	editingSprite.sprite.isPlayer = flipPos;
+	editingSprite.sprite.flipX = (editingSprite.sprite.xml.get("flipX") == "true") != flipPos;
+	editingSprite.sprite.offset.set(editingSprite.sprite.globalOffset.x * (flipPos != editingSprite.sprite.playerOffsets ? 1 : -1), -editingSprite.sprite.globalOffset.y);
+
+	if (editingSprite.index <= -1) {
+		var daButton;
+		daButton = new UIButton(0, 0, name, function() {
+			brightenShader.data.offset.value[0] = 0.3;
+			editingSprite = charMap[daButton.field.text];
+	
+			var selectedIndex = editingSprite.index;
+			for (button in sprList.buttons.members) {
+				var sprName = button.field.text;
+				var spr = (button.color == 0xFFFFFF) ? spriteMap[sprName] : charMap[sprName];
+	
+				if (spr == charMap["Combo Group"]) {
+					for (thing in spr.sprite.members)
+						thing.shaderEnabled = (spr.index == selectedIndex);
+				} else {
+					spr.sprite.shaderEnabled = (spr.index == selectedIndex);
+					if (spr.sprite.animateAtlas != null)
+						spr.sprite.animateAtlas.shaderEnabled = (spr.index == selectedIndex);
+				}
 			}
-		}
-	}, 250, 54);
-	daButton.autoAlpha = false;
-	daButton.frames = Paths.getFrames("editors/ui/grayscale-button");
-	daButton.color = color;
-	daButton.field.alignment = "left";
-	sprList.add(daButton);
+		}, 250, 54);
+		daButton.autoAlpha = false;
+		daButton.frames = Paths.getFrames("editors/ui/grayscale-button");
+		daButton.color = color;
+		daButton.field.alignment = "left";
+		sprList.add(daButton);
+	
+		var switchX = daButton.x + daButton.bWidth - 36;
+		if (name != "Player" && name != "Opponent" && name != "Spectator") {
+			var deleteButton = new UIButton(switchX, daButton.bHeight/2 - 16, "", function () {
+				var sprName = daButton.field.text;
+				editingSprite = (editingSprite != null && charMap[sprName].index == editingSprite.index) ? null : editingSprite;
 
-	var switchButton = new UIButton(daButton.x + daButton.bWidth - 36, daButton.bHeight/2 - 16, "", function () {
-		editingSprite = charMap[name];
-		openSubState(new ModSubState("stageEditor/SwitchScreen"));
-	}, 32);
-	switchButton.autoAlpha = false;
-	daButton.members.push(switchButton);
+				var spr = charMap[sprName].sprite;
+				sprList.remove(daButton);
+				daButton.destroy();
+				charMap.remove(sprName);
 
-	var switchIcon = new FlxSprite(switchButton.x + (15/2), switchButton.y + 8, Paths.image('editors/stage/switch-button'));
-	switchIcon.antialiasing = false;
-	daButton.members.push(switchIcon);
+				for (i in 0...sprList.buttons.members.length) { //fix the ordering again
+					var button = sprList.buttons.members[i];
+					var sprName = button.field.text;
+					if (button.color == 0xFFFFFF)
+						spriteMap[sprName].index = i;
+					else
+						charMap[sprName].index = i;
+				}
 
-	var editButton = new UIButton(switchButton.x - 36, switchButton.y, "", function () {
-		editingSprite = charMap[name];
+				stageGroup.remove(spr, true);
+				spr.destroy();
+				updateCharView();
+			}, 32);
+			deleteButton.color = 0xFFFF0000;
+			deleteButton.autoAlpha = false;
+			daButton.members.push(deleteButton);
 		
-	}, 32);
-	editButton.color = 0xFFFFFF00;
-	editButton.autoAlpha = false;
-	daButton.members.push(editButton);
+			var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+			deleteIcon.antialiasing = false;
+			daButton.members.push(deleteIcon);
 
-	var editIcon = new FlxSprite(editButton.x + (15/2), editButton.y + 8, Paths.image('editors/character/edit-button'));
-	editIcon.antialiasing = false;
-	daButton.members.push(editIcon);
+			editingSprite.deleteButton = deleteButton;
+			editingSprite.deleteIcon = deleteIcon;
+			switchX = deleteButton.x - 36;
+		}
 
-	charMap[name] = {
-		index: stageGroup.length,
-		node: node,
-		sprite: character,
+		var switchButton = new UIButton(switchX, daButton.bHeight/2 - 16, "", function () {
+			editingSprite = charMap[daButton.field.text];
+			openSubState(new ModSubState("stageEditor/SwitchScreen"));
+		}, 32);
+		switchButton.autoAlpha = false;
+		daButton.members.push(switchButton);
+	
+		var switchIcon = new FlxSprite(switchButton.x + (15/2), switchButton.y + 8, Paths.image('editors/stage/switch-button'));
+		switchIcon.antialiasing = false;
+		daButton.members.push(switchIcon);
+	
+		var editButton = new UIButton(switchButton.x - 36, switchButton.y, "", function () {
+			editingSprite = charMap[daButton.field.text];
+			openSubState(new UISubstateWindow(true, "stageEditor/sprites/CharPosScreen"));
+		}, 32);
+		editButton.color = 0xFFFFFF00;
+		editButton.autoAlpha = false;
+		daButton.members.push(editButton);
+	
+		var editIcon = new FlxSprite(editButton.x + (15/2), editButton.y + 8, Paths.image('editors/character/edit-button'));
+		editIcon.antialiasing = false;
+		daButton.members.push(editIcon);
+	
+		editingSprite.index = stageGroup.length;
 
-		button: daButton,
-		switchButton: switchButton,
-		switchIcon: switchIcon,
-		editButton: editButton,
-		editIcon: editIcon
-	};
-	stageGroup.add(character);
+		editingSprite.button = daButton;
+		editingSprite.switchButton = switchButton;
+		editingSprite.switchIcon = switchIcon;
+		editingSprite.editButton = editButton;
+		editingSprite.editIcon = editIcon;
+	} else if (editingSprite.node.nodeName == "char" || editingSprite.node.nodeName == "character") {
+		sprList.buttons.members[editingSprite.index].field.text = editingSprite.node.get("name");
+	}
 }
 
 function makeComboGroup(node) {
@@ -581,7 +760,7 @@ function makeComboGroup(node) {
 
 	var editButton = new UIButton(switchButton.x - 36, switchButton.y, "", function () {
 		editingSprite = charMap["Combo Group"];
-
+		openSubState(new UISubstateWindow(true, "stageEditor/sprites/ComboPosScreen"));
 	}, 32);
 	editButton.color = 0xFFFFFF00;
 	editButton.autoAlpha = false;
@@ -667,32 +846,74 @@ function loadStage() {
 				stageGroup.insert(editingSprite.index, editingSprite.sprite);
 				editingSprite.sprite;
 			case "box" | "solid":
-				trace("Boxes are currently unsupported!");
-				null;
+				function getAtt(name, defaultVal) {
+					return Std.parseFloat(node.exists(name) ? node.get(name) : defaultVal);
+				}
+				var xmlColor = node.exists("color") ? CoolUtil.getColorFromDynamic(node.get("color")) : -1;
+				editingSprite = {
+					index: -1,
+					node: node,
+					sprite: new FlxSprite(getAtt("x", "0"), getAtt("y", "0")).makeSolid(getAtt("width", "0"), getAtt("height", "0"), xmlColor)
+				}
+
+				saveSprButton();
+				spriteMap.set(node.get("name"), editingSprite);
+			
+				editingSprite.sprite.shader = brightenShader;
+				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
 			case "boyfriend" | "bf" | "player":
-				var charX = (node.exists("x")) ? node.get("x") : 770;
-				var charY = (node.exists("y")) ? node.get("y") : 100;
+				editingSprite = {
+					index: -1,
+					node: node,
+					sprite: new Character(0, 0, "bf", false)
+				}
+				
+				saveCharButton("Player", 770, 100, 1, 0xFF31B0D1);
+				charMap.set("Player", editingSprite);
 
-				var char = new Character(charX, charY, "bf", true);
-				char.shader = brightenShader;
-				makeCharButton("Player", node, 0xFF31B0D1, char);
-				char;
+				editingSprite.sprite.shader = brightenShader;
+				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
 			case "girlfriend" | "gf":
-				var charX = (node.exists("x")) ? node.get("x") : 400;
-				var charY = (node.exists("y")) ? node.get("y") : 130;
+				editingSprite = {
+					index: -1,
+					node: node,
+					sprite: new Character(0, 0, "gf", false)
+				}
+				
+				saveCharButton("Spectator", 400, 130, 0.95, 0xFFA5004D);
+				charMap.set("Spectator", editingSprite);
 
-				var char = new Character(charX, charY, "gf", false);
-				char.shader = brightenShader;
-				makeCharButton("Spectator", node, 0xFFA5004D, char);
-				char;
+				editingSprite.sprite.shader = brightenShader;
+				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
 			case "dad" | "opponent":
-				var charX = (node.exists("x")) ? node.get("x") : 100;
-				var charY = (node.exists("y")) ? node.get("y") : 100;
+				editingSprite = {
+					index: -1,
+					node: node,
+					sprite: new Character(0, 0, "dad", false)
+				}
+				
+				saveCharButton("Opponent", 100, 100, 1, 0xFFAF66CE);
+				charMap.set("Opponent", editingSprite);
 
-				var char = new Character(charX, charY, "dad", false);
-				char.shader = brightenShader;
-				makeCharButton("Opponent", node, 0xFFAF66CE, char);
-				char;
+				editingSprite.sprite.shader = brightenShader;
+				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
+			case "character" | "char":
+				editingSprite = {
+					index: -1,
+					node: node,
+					sprite: new Character(0, 0, "bf", false)
+				}
+				
+				saveCharButton(node.get("name"), 0, 0, 1, 0xFFFF0396);
+				charMap.set(node.get("name"), editingSprite);
+
+				editingSprite.sprite.shader = brightenShader;
+				stageGroup.insert(editingSprite.index, editingSprite.sprite);
+				editingSprite.sprite;
 			case "ratings" | "combo":
 				makeComboGroup(node);
 				charMap["Combo Group"].sprite;

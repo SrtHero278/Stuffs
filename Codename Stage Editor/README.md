@@ -6,8 +6,8 @@ like this!
 
 ![image](https://github.com/SrtHero278/Stuffs/assets/93018286/427883ef-3c19-4661-a1b1-cd34a4bb8ff6)
 
-# THIS IS ALSO A HEAVY WIP.
+# THIS MAY SLOW DOWN ON DEVELOPMENT.
 
-dont expect everything to be here.
+the majority of the nesscessities have been implemented, thus less and less will be updated.
 
-however, you can make a basic stage with this so far!
+however, feel free to report any bugs found!

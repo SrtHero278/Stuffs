@@ -82,12 +82,16 @@ function destroy() {
 
 function changeChar() {
 	var char = FlxG.state.stateScripts.get("editingSprite");
+	var wasPlayer = char.sprite.isPlayer;
 	var stageGroup = FlxG.state.stateScripts.get("stageGroup");
 
-	var newChar = new Character(char.sprite.x, char.sprite.y, tree.members[0].members[tree.members[0].curSelected].text, char.sprite.isPlayer);
+	var newChar = new Character(char.sprite.x, char.sprite.y, tree.members[0].members[tree.members[0].curSelected].text);
 	stageGroup.remove(char.sprite, true);
 	char.sprite.destroy();
 	char.sprite = newChar;
+	char.sprite.isPlayer = wasPlayer;
+	char.sprite.flipX = (char.sprite.xml.get("flipX") == "true") != wasPlayer;
+	char.sprite.offset.set(char.sprite.globalOffset.x * (wasPlayer != char.sprite.playerOffsets ? 1 : -1), -char.sprite.globalOffset.y);
 	stageGroup.insert(char.index, char.sprite);
 
 	close();

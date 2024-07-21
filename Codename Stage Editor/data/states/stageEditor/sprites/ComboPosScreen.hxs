@@ -1,0 +1,97 @@
+// basically BoxScreen.hxs but modified for combo.
+
+var brightenShader = FlxG.state.stateScripts.get("brightenShader"); // kinda weird way of getting it but cameras break on static vars.
+
+var editingSprite = FlxG.state.stateScripts.get("editingSprite");
+
+import Xml;
+import Reflect;
+var getProp = Reflect.getProperty;
+
+import funkin.editors.ui.UIText;
+import funkin.editors.ui.UIButton;
+import funkin.editors.ui.UINumericStepper;
+
+var posX:UINumericStepper;
+var posY:UINumericStepper;
+
+var saveButton:UIButton;
+var closeButton:UIButton;
+
+var nodeList = []; //This will get set soon.
+
+function create() {
+	winTitle = 'Combo properties';
+
+	winWidth = 310;
+	winHeight = 190;
+}
+
+function postCreate() {
+	function addLabelOn(ui, text:String)
+		add(new UIText(ui.x, ui.y - 24, 0, text));
+
+	posX = new UINumericStepper(windowSpr.x + 20, windowSpr.y + 80, editingSprite.sprite.x, 0.001, 2, null, null, 155);
+	add(posX);
+	addLabelOn(posX, "Position (X,Y)");
+
+	add(new UIText(posX.x + 155 - 32, posX.y + 9, 0, ",", 22));
+
+	posY = new UINumericStepper(posX.x + 155 - 32 + 20, posX.y, editingSprite.sprite.y, 0.001, 2, null, null, 155);
+	add(posY);
+
+	saveButton = new UIButton(windowSpr.x + windowSpr.bWidth - 20 - 125, windowSpr.y + windowSpr.bHeight - 16 - 32, "Save & Close", function() {
+		saveData();
+		close();
+	}, 125);
+	add(saveButton);
+
+	closeButton = new UIButton(saveButton.x - 20, saveButton.y, "Close", function() {
+		close();
+	}, 125);
+	add(closeButton);
+	closeButton.color = 0xFFFF0000;
+	closeButton.x -= closeButton.bWidth;
+
+	setNodeList();
+}
+
+function saveData() {
+	for (box in [posX, posY]) {
+		if (box.onChange != null)
+			box.onChange(box.label.text); // workaround the fact the value property only gets set on unfocus.
+	}
+
+	var oldName = editingSprite.node.get("name");
+	var curNode = editingSprite.node;
+
+	for (thingy in nodeList) {
+		editingSprite.node.remove(thingy.name); // remove it to get rid of default values.
+		var value = getProp(thingy.inputObject, thingy.prop);
+		if (value != thingy.defaultVal)
+			editingSprite.node.set(thingy.name, value);
+	}
+
+	trace(editingSprite.node);
+	editingSprite.sprite.setPosition(
+		editingSprite.node.exists("x") ? Std.parseFloat(editingSprite.node.get("x")) : (FlxG.width * 0.55),
+		editingSprite.node.exists("y") ? Std.parseFloat(editingSprite.node.get("y")) : (FlxG.height * 0.5 - 60)
+	);
+}
+
+function setNodeList() {
+	nodeList = [
+		{
+			name: "x",
+			inputObject: posX,
+			prop: "value",
+			defaultVal: FlxG.width * 0.55
+		},
+		{
+			name: "y",
+			inputObject: posY,
+			prop: "value",
+			defaultVal: FlxG.height * 0.5 - 60
+		}
+	];
+}
