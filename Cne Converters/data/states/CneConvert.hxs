@@ -1,20 +1,20 @@
-import haxe.io.Path;
-
-import funkin.menus.FreeplaySonglist;
-import funkin.menus.MainMenuState;
 import funkin.backend.system.framerate.Framerate;
 import funkin.options.type.ArrayOption;
 import funkin.options.type.TextOption;
 import funkin.options.type.IconOption;
 import funkin.options.type.NumOption;
 import funkin.options.OptionsScreen;
-import funkin.editors.EditorTreeMenu;
+import funkin.menus.FreeplaySonglist;
+import funkin.menus.MainMenuState;
+import funkin.backend.chart.Chart;
 import funkin.editors.ui.UIWarningSubstate;
 import funkin.editors.ui.UIState;
-import funkin.backend.chart.Chart;
-import lime.ui.FileDialog;
+import funkin.editors.EditorTreeMenu;
 import lime.ui.FileDialogType;
+import lime.ui.FileDialog;
+import haxe.ds.StringMap;
 import haxe.xml.Printer;
+import haxe.io.Path;
 import sys.io.File;
 import StringTools;
 import Reflect;
@@ -46,7 +46,8 @@ function create() {
 			var subList = [
 				new TextOption("Cne to Psych", "Press ACCEPT to convert to a psych chart.", function()
 					openChartList("Cne to Psych", CHART_cneToPsych)
-				)
+				),
+				new TextOption("Stepmania to Cne", "Press ACCEPT to convert from a stepmania chart.", CHART_smToCne)
 			];
 
 			optionsTree.add(new OptionsScreen("Convert Chart", "Select a converter method.", subList));
@@ -64,7 +65,7 @@ function create() {
 				)
 			];
 
-			optionsTree.add(new OptionsScreen("Convert Chart", "Select a converter method.", subList));
+			optionsTree.add(new OptionsScreen("Convert Characters", "Select a converter method.", subList));
 		}),
 		new TextOption("Converter Options", "Press ACCEPT to adjust the converters.", openOptions)
 	];
@@ -413,6 +414,158 @@ function CHART_cneToPsych(song, diff) {
 		File.saveContent(file, Json.stringify({song: psychJson}, null, "\t"));
 	});
 	dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Psych Chart JSON.');
+}
+
+function CHART_smToCne() {
+	curFunc = "CHART_smToCne";
+
+	var charts = new StringMap();
+	var meta = {needsVoices: false, stepsPerBeat: 4, beatsPerMeasure: 4};
+	var curChart = null;
+	var chartOffset = 0;
+	var bpmChanges = [];
+	var changeIndex = 0;
+	var curTime = 0;
+	var curBeat = 0;
+	var queuedHolds = [for (i in 0...8) null];
+	var queuedLines = [];
+	var curMode = "<NONE>";
+
+	function parseLine(line) {switch (curMode) {
+		case "<NONE>":
+			curMode = line.substring(1, line.indexOf(":"));
+			parseLine(line);
+		case "OFFSET":
+			chartOffset = Std.parseFloat(line.substring(line.indexOf(":") + 1, line.indexOf(";"))) * 1000;
+			curMode = "<NONE>";
+		case "BPMS":
+			for (bpm in line.split(",")) {
+				bpm = StringTools.trim(bpm);
+				if (StringTools.startsWith(bpm, ";")) continue;
+				var beat = Std.parseFloat(bpm.substring(bpm.indexOf(":") + 1, bpm.indexOf("=")));
+				var bpm = Std.parseFloat(bpm.substring(bpm.indexOf("=") + 1, bpm.length));
+				if (bpmChanges.length > 0)
+					curTime += bpmChanges[bpmChanges.length - 1].crochet * (beat - curBeat);
+				bpmChanges.push({time: curTime, beat: beat, crochet: 60 / bpm * 1000, bpm: bpm});
+				curBeat = beat;
+			}
+
+			if (StringTools.endsWith(line, ";")) {
+				meta.bpm = bpmChanges[0].bpm;
+				curMode = "<NONE>";
+			}
+		case "NOTES":
+			if (curChart == null) {
+				changeIndex = curTime = curBeat = 0;
+				curChart = {
+					strumLines: [{
+						characters: ["bf"],
+						type: 1,
+						notes: [],
+						position: "boyfriend"
+					}],
+					events: [for (i in 1...bpmChanges.length)
+						{name: "BPM Change", time: bpmChanges[i].time, params: [bpmChanges[i].bpm]}],
+					codenameChart: true,
+					stage: "stage",
+					scrollSpeed: 3.2,
+					noteTypes: []
+				};
+			}
+
+			queuedLines.push(StringTools.trim(line));
+			if (queuedLines.length >= 6) {
+				charts.set(queuedLines[3].substring(0, queuedLines[3].length - 1), curChart);
+
+				var chartType = StringTools.replace(queuedLines[1].toLowerCase(), " ", "-");
+				if (chartType == "dance-solo:") {
+					onPanic('"Dance Solo" (Not "Dance Single") is unsupported.');
+					return;
+				}
+				if (StringTools.startsWith(chartType, "pump")) {
+					onPanic('"Pump It Up" charts are unsupported.');
+					return;
+				}
+				if (chartType != "dance-single:") {
+					curChart.strumLines.insert(0, {
+						characters: ["dad"],
+						type: 0,
+						notes: [],
+						position: "dad"
+					});
+				}
+				queuedLines = [];
+				curMode = "NOTE-QUEUE";
+			}
+		case "NOTE-QUEUE":
+			line = StringTools.trim(line);
+
+			if (line.charAt(0) == "," || line.charAt(0) == ";") {
+				var beatInc = meta.beatsPerMeasure / queuedLines.length;
+				for (i in 0...queuedLines.length) {
+					while (changeIndex < bpmChanges.length && bpmChanges[changeIndex].beat <= curBeat + beatInc)
+						changeIndex++;
+					for (l in 0...(4 * curChart.strumLines.length)) {
+						var noteType = queuedLines[i].charAt(l);
+						switch (noteType) {
+							case "1", "2":
+								var newNote = {time: curTime - chartOffset, id: l % 4, type: 0, sLen: 0};
+								if (noteType == "2") queuedHolds[l] = newNote;
+								curChart.strumLines[Math.floor(l * 0.25)].notes.push(newNote);
+							case "3":
+								if (queuedHolds[l] != null) {
+									queuedHolds[l].sLen = (curTime - chartOffset) - queuedHolds[l].time;
+									queuedHolds[l] = null;
+								}
+						}
+					}
+					curBeat += beatInc;
+					curTime += bpmChanges[changeIndex - 1].crochet * beatInc;
+				}
+	
+				queuedLines = [];
+				if (line.charAt(0) == ";") {
+					curChart = null;
+					curMode = "<NONE>";
+				}
+				return;
+			}
+
+			if (line != "")
+				queuedLines.push(line);
+		default:
+			curMode = "<NONE>";
+	}}
+
+	var mapIterator;
+	function nextDiff() {
+		var diff = mapIterator.next();
+		var dialog = new FileDialog();
+		dialog.onSelect.add(function(file) {
+			File.saveContent(file, Json.stringify(charts[diff]));
+			if (mapIterator.hasNext())
+				nextDiff();
+			else {
+				var dialog = new FileDialog();
+				dialog.onSelect.add(function(file) {
+					File.saveContent(file, Json.stringify(meta, null, "\t"));
+				});
+				dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Codename Chart Metadata.');
+			}
+		});
+		dialog.browse(FileDialogType.SAVE, 'json', null, 'Save Codename Chart JSON. (' + diff + ' Difficulty)');
+	}
+
+	var dialog = new FileDialog();
+	dialog.onSelect.add(function(file) {
+		meta.name = Path.withoutDirectory(Path.withoutExtension(file)).toLowerCase();
+		for (line in File.getContent(file).split("\n"))
+			parseLine(line);
+		mapIterator = charts.keys();
+		if (mapIterator.hasNext()) 
+			nextDiff();
+	});
+	dialog.browse(FileDialogType.OPEN, 'sm', null, 'Open Stepmania File.');
 }
 
 function CHARACTER_psychToCne() {
