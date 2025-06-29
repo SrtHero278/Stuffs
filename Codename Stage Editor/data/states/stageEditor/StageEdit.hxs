@@ -64,8 +64,8 @@ function updateCharView() {
 		onSelect: function(_) {
 			var zoom = (xml.exists("zoom")) ? Std.parseFloat(xml.get("zoom")) : 1.05;
 			FlxTween.tween(FlxG.camera.scroll, {
-				x: xml.exists("startCamPosX") ? xml.get("startCamPosX") : 0,
-				y: xml.exists("startCamPosY") ? xml.get("startCamPosY") : 0
+				x: (xml.exists("startCamPosX") ? xml.get("startCamPosX") : 0) - FlxG.width * 0.5,
+				y: (xml.exists("startCamPosY") ? xml.get("startCamPosY") : 0) - FlxG.height * 0.5
 			}, 0.5, {ease: FlxEase.quadOut});
 			FlxTween.tween(FlxG.camera, {zoom: zoom}, 0.5, {ease: FlxEase.quadOut});
 		}
@@ -335,7 +335,7 @@ function dropFile(file) {
 		saveSprButton();
 		spriteMap.set(editingSprite.node.get("name"), editingSprite);
 	
-		editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+		editingSprite.sprite = makeSprite(editingSprite.node);
 		editingSprite.sprite.shader = brightenShader;
 		stageGroup.insert(editingSprite.index, editingSprite.sprite);
 	}
@@ -468,6 +468,16 @@ function postUpdate(e) {
 	}
 }
 
+function makeSprite(node) {
+	// fix the null obj
+	var folder = (xml.exists("folder") ? xml.get("folder") : "");
+	var path = Paths.image(folder + (node.exists("sprite") ? node.get("sprite") : node.get("name")));
+	if (Paths.tempFramesCache.exists(path) && Paths.tempFramesCache.get(path) == null)
+		Paths.tempFramesCache.remove(path);
+
+	return XMLUtil.createSpriteFromXML(node, folder);
+}
+
 function saveSprButton() {
 	var sprName = editingSprite.node.get("name");
 
@@ -521,7 +531,7 @@ function saveSprButton() {
 		deleteButton.autoAlpha = false;
 		daButton.members.push(deleteButton);
 
-		var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+		var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/delete-button'));
 		deleteIcon.antialiasing = false;
 		daButton.members.push(deleteIcon);
 
@@ -567,10 +577,15 @@ function checkEmptyFrame() {
 	if (editingSprite.node.nodeName == "box" || editingSprite.node.nodeName == "solid") return;
 	if (editingSprite.sprite._frame != null && editingSprite.sprite.graphic.assetsKey != "flixel/images/logo/default.png") return;
 
-	var message = 'Sprite "' + editingSprite.node.get("name") + '" was unable to properly load the graphic.\n'
-				+ 'Stage Folder: "' + xml.get("folder") + '"\n'
-				+ 'Sprite Image: "' + (editingSprite.node.exists("sprite") ? editingSprite.node.get("sprite") : "CANNOT FIND `sprite` ATTRIBUTE.") + '"\n'
-				+ 'Attempted Path: "images/' + xml.get("folder") + editingSprite.node.get("sprite") + '.png"';
+	function getAtt(name, defaultVal) {
+		return editingSprite.node.exists(name) ? editingSprite.node.get(name) : defaultVal;
+	}
+
+	var name = getAtt("name", "<NAME-NOT-PROVIDED>");
+	var message = 'Sprite "' + name + '" was unable to properly load the graphic.\n'
+				+ 'Stage Folder: "' + (xml.exists("folder") ? xml.get("folder") : "Not Provided; Using Regular Path.") + '"\n'
+				+ 'Sprite Image: "' + getAtt("sprite", 'Not Provided; Using "' + name + '".') + '"\n'
+				+ 'Attempted Path: "images/' + (xml.exists("folder") ? xml.get("folder") : "") + getAtt("sprite", name) + '.png"';
 	var warningText = new UIText(10, 710, 0, message, 18, 0xFFFF2E54);
 	warningText.y -= warningText.height;
 	warningText.cameras = [uiCamera];
@@ -666,7 +681,7 @@ function saveCharButton(name, defaultX, defaultY, defaultScroll, color) {
 			deleteButton.autoAlpha = false;
 			daButton.members.push(deleteButton);
 		
-			var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+			var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/delete-button'));
 			deleteIcon.antialiasing = false;
 			daButton.members.push(deleteIcon);
 
@@ -836,7 +851,7 @@ function loadStage() {
 				editingSprite = {
 					index: -1,
 					node: node,
-					sprite: XMLUtil.createSpriteFromXML(node, xml.get("folder"))
+					sprite: makeSprite(node)
 				}
 
 				saveSprButton();

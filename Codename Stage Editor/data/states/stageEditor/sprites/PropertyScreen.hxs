@@ -257,7 +257,7 @@ function saveProperties() {
 		editingSprite.sprite.destroy(); // much easier to remake than mess with it lol.
 	}
 
-	editingSprite.sprite = XMLUtil.createSpriteFromXML(editingSprite.node, xml.get("folder"));
+	editingSprite.sprite = makeSprite(editingSprite.node);
 	editingSprite.sprite.shader = brightenShader;
 	stageGroup.insert(editingSprite.index, editingSprite.sprite);
 
@@ -302,7 +302,7 @@ function makeNodeButton(node, isNew) {
 	deleteButton.autoAlpha = false;
 	daButton.members.push(deleteButton);
 
-	var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/character/delete-button'));
+	var deleteIcon = new FlxSprite(deleteButton.x + (15/2), deleteButton.y + 8, Paths.image('editors/delete-button'));
 	deleteIcon.antialiasing = false;
 	daButton.members.push(deleteIcon);
 
