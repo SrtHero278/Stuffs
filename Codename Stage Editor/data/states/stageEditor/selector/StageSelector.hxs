@@ -3,7 +3,7 @@ import haxe.io.Path;
 import funkin.backend.system.framerate.Framerate;
 import funkin.options.type.TextOption;
 import funkin.options.type.NewOption;
-import funkin.options.OptionsScreen;
+import funkin.options.TreeMenuScreen;
 import funkin.editors.ui.UISubstateWindow;
 import funkin.editors.ui.UIState;
 
@@ -15,10 +15,11 @@ function create() {
 	Framerate.offset.y = 60;
 
 	var modsList = getList(true);
+	trace(modsList);
 
 	var list = [
 		for (stage in (modsList.length == 0 ? getList(false) : modsList))
-			new TextOption(stage, "Press ACCEPT to edit this stage.",
+			new TextOption(stage, "Press ACCEPT to edit this stage.", "",
 			function() {
 				StageEditor_stage = stage;
 				FlxG.switchState(new UIState(true, "stageEditor/StageEdit"));
@@ -29,7 +30,7 @@ function create() {
 		openSubState(new UISubstateWindow(true, "stageEditor/selector/NewStage"));
 	}));
 
-	main = new OptionsScreen("Stage Editor", "Select a stage to modify.", list);
+	addMenu(new TreeMenuScreen("Stage Editor", "Select a stage to modify.", "", list));
 }
 
 function getList(mods) {

@@ -1,21 +1,24 @@
 import Xml;
 import haxe.io.Path;
 
+import flixel.input.FlxPointer;
 import flixel.addons.display.FlxBackdrop;
 import flixel.FlxCamera;
 
 import openfl.filters.ShaderFilter;
 
-import funkin.backend.scripting.Script;
-import funkin.options.OptionsScreen;
-import funkin.options.OptionsTree;
+import funkin.options.TreeMenuScreen;
 import funkin.options.type.IconOption;
 
+var treeMenu;
 var tree;
 
 var camShaders = [];
 var blurShader:CustomShader = new CustomShader(Options.intensiveBlur ? "engine/editorBlur" : "engine/editorBlurFast");
 var screenCam = new FlxCamera();
+
+function overlaps(spr)
+	spr.overlapsPoint(FlxG.mouse.getWorldPosition(screenCam, tree._point), true);
 
 function create() {
 	CoolUtil.playMenuSFX(0);
@@ -60,15 +63,31 @@ function create() {
 			new IconOption(char, "Press ACCEPT to edit this character.", Character.getIconFromCharName(char), changeChar)
 	];
 
-	tree = new OptionsTree();
-	tree.add(new OptionsScreen("Character List", "Select a character to switch to.", list));
+	tree = new TreeMenuScreen("Character List", "Select a character to switch to.", "", list);
 	add(tree);
 
 	cameras = [screenCam];
 }
 
 function update(e) {
-	if (FlxG.keys.justPressed.ESCAPE)
+	// hacking inputs cuz that shit be crashing
+	for (basic in tree.turboBasics) basic.update(e);
+
+	var change = (tree.downTurboControl.activated - tree.upTurboControl.activated) - FlxG.mouse.wheel;
+	var mouseControl = false;
+	if (FlxG.mouse.justPressed) {
+		for (i in CoolUtil.maxInt(tree.curSelected - 3, 0)...CoolUtil.minInt(tree.curSelected + 4, tree.length))
+			if (i != tree.curSelected && tree.members[i] != null && overlaps(tree.members[i])) {
+				change = i - tree.curSelected;
+				mouseControl = true;
+				break;
+			}
+	}
+	tree.changeSelection(change);
+
+	if (controls.ACCEPT || (!mouseControl && FlxG.mouse.justPressed && overlaps(tree.members[tree.curSelected])))
+		tree.curOption.select();
+	else if (controls.BACK)
 		close();
 }
 
@@ -85,7 +104,7 @@ function changeChar() {
 	var wasPlayer = char.sprite.isPlayer;
 	var stageGroup = FlxG.state.stateScripts.get("stageGroup");
 
-	var newChar = new Character(char.sprite.x, char.sprite.y, tree.members[0].members[tree.members[0].curSelected].text);
+	var newChar = new Character(char.sprite.x, char.sprite.y, tree.curOption.text);
 	stageGroup.remove(char.sprite, true);
 	char.sprite.destroy();
 	char.sprite = newChar;

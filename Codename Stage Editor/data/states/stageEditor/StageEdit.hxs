@@ -18,6 +18,7 @@ import flixel.group.FlxTypedGroup;
 import flixel.FlxCamera;
 
 import funkin.backend.assets.ModsFolder;
+import funkin.options.TreeMenu;
 import funkin.editors.EditorTreeMenu;
 import funkin.editors.ui.UIText;
 import funkin.editors.ui.UIState;
@@ -197,7 +198,8 @@ function create() {
 	sprList = new UIButtonList(FlxG.width - 265, 30, 250, FlxG.height - 45, "Sprite List", FlxPoint.get(250, 54), null, 0);
 	sprList.cameras = [uiCamera];
 	sprList.frames = Paths.getFrames('editors/ui/inputbox');
-	sprList.addButton.field.text = "Sprite";
+	sprList.addButton.members.push(sprList.addButton.field = new UIText(sprList.addButton.x, sprList.addButton.y, sprList.addButton.bWidth, "Sprite"));
+	sprList.addButton.field.fieldWidth = sprList.addButton.bWidth;
 	sprList.addButton.field.size = 13;
 	sprList.addButton.field.alignment = "left";
 	sprList.addButton.resize(sprList.addButton.bWidth / 3, sprList.addButton.bHeight);
@@ -314,7 +316,7 @@ function dropFile(file) {
 	var sprName = Path.withoutDirectory(Path.withoutExtension(file));
 
 	if (subState != null && subState.scriptName == "stageEditor/sprites/SpriteScreen") {
-		if (subState.stateScripst.get("newSprite"))
+		if (subState.stateScripts.get("newSprite"))
 			subState.stateScripts.get("nameTextBox").label.text = sprName;
 		subState.stateScripts.get("fileTextBox").label.text = sprName;
 	} else {
@@ -395,7 +397,7 @@ function update(e) {
 	currentCursor = "arrow";
 	if (uiPos.x <= 1010 && editingSprite != null) {
 		canClick = overlappingPoint();
-		currentCursor = (canClick) ? "hand" : "arrow";
+		currentCursor = (canClick) ? "HAND" : "arrow";
 		if (canClick && FlxG.mouse.justPressed) {
 			movingSpr = true;
 			oldPos = [editingSprite.sprite.x, editingSprite.sprite.y];
@@ -935,8 +937,8 @@ function loadStage() {
 		}
 
 		if (sprite != null) {
-			if (Std.isOfType(sprite, FunkinSprite))
-				sprite.initialZoom = FlxG.camera.zoom;
+			//if (Std.isOfType(sprite, FunkinSprite))
+				//sprite.initialZoom = FlxG.camera.zoom;
 			for(prop in node.elementsNamed("property"))
 				XMLUtil.applyXMLProperty(sprite, prop);
 		}
